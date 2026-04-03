@@ -606,7 +606,10 @@
         geoJsonLayer.eachLayer(layer => {
             const props = layer.feature.properties; const id = props.KIMLIKNO, ilce = props.ILCEAD;
             const isVisible = (targetI === 'all' || ilce === targetI);
-            if (!isVisible) { layer.setStyle({ opacity: 0, fillOpacity: 0, interactive: false }); return; }
+            if (!isVisible) { 
+                layer.setStyle({ opacity: 0, fillOpacity: 0, fillColor: 'transparent', color: 'transparent', interactive: false }); 
+                return; 
+            }
             
             const val = (view === 'mahalle') ? calculateValue(stats.mahalle[id]) : calculateValue(stats.ilce[ilce]);
             layer.setStyle({ fillColor: getColor(val, min, maxLegend, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#475569', weight: view === 'ilce' ? 0.3 : 0.7, opacity: 1, interactive: true });
@@ -755,13 +758,15 @@
             };
         });
         document.getElementById('col-single').onchange = (e) => { config.column = e.target.value; refreshVisuals(); };
+        document.getElementById('col-numerator').onchange = (e) => { config.numerator = e.target.value; refreshVisuals(); };
+        document.getElementById('col-denominator').onchange = (e) => { config.denominator = e.target.value; refreshVisuals(); };
+        document.getElementById('ilce-filter').onchange = (e) => { config.ilce = e.target.value; refreshVisuals(); };
         document.getElementById('city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('overlay-city-select').value = e.target.value; handleFile(null); };
         document.getElementById('overlay-city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('city-select').value = e.target.value; };
-        
         document.getElementById('count-single-toggle').onchange = (e) => { config.useCountSingle = e.target.checked; refreshVisuals(); };
         document.getElementById('count-num-toggle').onchange = (e) => { config.useCountNum = e.target.checked; refreshVisuals(); };
         document.getElementById('count-den-toggle').onchange = (e) => { config.useCountDen = e.target.checked; refreshVisuals(); };
-
+        
         const slider = document.getElementById('max-limit-slider');
         const manualToggle = document.getElementById('manual-max-toggle');
         const sliderContainer = document.getElementById('slider-container');
