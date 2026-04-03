@@ -1,0 +1,10 @@
+{
+  "status": "success",
+  "maps": [
+    {
+      "name": "Mugla Mahalleler",
+      "path": "./maps/mugla_mahalleler.geojson",
+      "file": "mugla_mahalleler.geojson"
+    }
+  ]
+}

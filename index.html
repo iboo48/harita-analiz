@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gelişmiş Mahalle Veri Analiz Haritası (GitHub Edition)</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: rgba(30, 41, 59, 0.7);
+            --accent: #3b82f6;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: rgba(51, 65, 85, 0.5);
+            --glass: rgba(15, 23, 42, 0.9);
+            --radius: 12px;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        #app { display: flex; height: 100vh; width: 100vw; }
+
+        #sidebar {
+            width: 400px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            z-index: 1001; box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+        }
+
+        .sidebar-header {
+            padding: 24px; border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.2); text-align: center;
+        }
+
+        .sidebar-header h1 { font-size: 1.1rem; margin: 0; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+
+        .sidebar-content { padding: 20px; flex: 1; overflow-y: auto; }
+
+        .section-title {
+            font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em;
+            color: var(--accent); margin-bottom: 12px; margin-top: 24px; font-weight: 700;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 16px; margin-bottom: 16px;
+        }
+
+        label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px; }
+
+        select {
+            width: 100%; padding: 10px; background: #1e293b;
+            border: 1px solid var(--border); border-radius: 6px;
+            color: white; font-family: inherit; outline: none; cursor: pointer; font-size: 0.85rem;
+        }
+
+        .btn-toggle-group {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+            background: rgba(0,0,0,0.2); padding: 4px; border-radius: 8px;
+        }
+
+        .btn-toggle-group button {
+            padding: 8px; background: transparent; border: none; border-radius: 6px;
+            color: var(--text-secondary); cursor: pointer; font-size: 0.75rem;
+            transition: all 0.2s; font-weight: 500;
+        }
+
+        .btn-toggle-group button.active { background: var(--accent); color: white; font-weight: 600; }
+
+        #map-container { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; background: #0b0f1a; }
+
+        #upload-overlay {
+            position: absolute; inset: 0;
+            background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(20px);
+            z-index: 2000; display: flex; align-items: center; justify-content: center;
+        }
+
+        .drop-zone {
+            width: 450px; padding: 60px 40px;
+            border: 2px dashed var(--border); border-radius: 20px;
+            text-align: center; cursor: pointer; transition: all 0.3s;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .drop-zone:hover { border-color: var(--accent); background: rgba(59, 130, 246, 0.05); }
+
+        #legend {
+            position: absolute; bottom: 30px; right: 30px;
+            background: var(--glass); backdrop-filter: blur(15px);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 16px; min-width: 220px; z-index: 1000; box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 0.75rem; }
+        .color-box { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: #1e293b; color: white; border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); padding: 5px;
+        }
+
+        .popup-table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+        .popup-table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .popup-table tr.highlight { background: rgba(59,130,246,0.15); color: #60a5fa; font-weight: 700; }
+
+        #loader {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.8); place-items: center; z-index: 9999;
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="loader"><div class="spinner"></div></div>
+
+<div id="app">
+    <div id="sidebar">
+        <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;">
+            <h1 style="font-size: 1rem;">🗺️ Harita Analizi</h1>
+            <span style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px; font-weight:700;">STATIC</span>
+        </div>
+        
+        <div class="sidebar-content">
+            <div id="data-controls" class="hidden">
+                <div class="section-title">Analiz Modu</div>
+                <div class="control-group">
+                    <div class="btn-toggle-group" id="mode-toggle">
+                        <button data-mode="single" class="active">Miktar (SUM)</button>
+                        <button data-mode="percent">Oran (%)</button>
+                    </div>
+                </div>
+
+                <div class="section-title">Sütun Seçimi</div>
+                <div class="control-group">
+                    <div id="single-col-group">
+                        <label>Veri Sütunu</label>
+                        <select id="col-single"></select>
+                        <label class="switch" style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="count-single-toggle" style="width:auto; cursor:pointer;">
+                            <span style="font-size:0.7rem; color:var(--text-secondary);">Değer yerine adeti (veri sayısını) kullan</span>
+                        </label>
+                    </div>
+                    
+                    <div id="percent-col-group" class="hidden">
+                        <div style="margin-bottom: 12px;">
+                            <label>Pay (Üst Değer)</label>
+                            <select id="col-numerator"></select>
+                            <label class="switch" style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="count-num-toggle" style="width:auto; cursor:pointer;">
+                                <span style="font-size:0.7rem; color:var(--text-secondary);">Pay için adeti kullan</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label>Payda (Alt Değer)</label>
+                            <select id="col-denominator"></select>
+                            <label class="switch" style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="count-den-toggle" style="width:auto; cursor:pointer;">
+                                <span style="font-size:0.7rem; color:var(--text-secondary);">Payda için adeti kullan</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-title">Harita Ayarları</div>
+                <div class="control-group">
+                    <label>Lejant Hassasiyeti (Basamak)</label>
+                    <select id="legend-steps">
+                        <option value="3">3 Basamak (Basit)</option>
+                        <option value="5" selected>5 Basamak (Standart)</option>
+                        <option value="8">8 Basamak (Detaylı)</option>
+                        <option value="10">10 Basamak (Hassas)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin-bottom:0">Yoğunluk Skalası (Üst Limit)</label>
+                        <label class="switch" style="margin-bottom:0; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <input type="checkbox" id="manual-max-toggle" style="width:auto; cursor:pointer;">
+                            <span style="font-size:0.65rem; color:var(--text-secondary);">Manuel</span>
+                        </label>
+                    </div>
+                    <div id="slider-container" style="display: flex; align-items: center; gap: 10px; opacity: 0.4; pointer-events: none;">
+                        <input type="range" id="max-limit-slider" min="1" max="10000" value="1000" style="flex: 1; accent-color: var(--accent);">
+                        <input type="number" id="max-limit-val" style="font-size: 0.8rem; width: 65px; text-align: right; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: white; padding: 4px;" value="0">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Renk Teması</label>
+                    <select id="palette-select">
+                        <option value="GYR">Performans (Yeşil -> Kırmızı)</option>
+                        <option value="RYG">Risk (Kırmızı -> Yeşil)</option>
+                        <option value="OCEAN">Okyanus (Mavi Tonları)</option>
+                        <option value="PURPLE">Kıvılcım (Mor -> Turuncu)</option>
+                        <option value="TRAFFIC">Trafik (G-S-K)</option>
+                    </select>
+                </div>
+
+                <div class="section-title">Görünüm ve Filtre</div>
+                <div class="control-group">
+                    <label>Çalışma Haritası (İl/Bölge)</label>
+                    <select id="city-select">
+                        <option value="">Yükleniyor...</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Harita Düzeyi</label>
+                    <div class="btn-toggle-group" id="view-toggle" style="margin-bottom: 12px;">
+                        <button data-view="mahalle" class="active">Mahalle</button>
+                        <button data-view="ilce">İlçe</button>
+                    </div>
+                    <label>İlçe Filtresi</label>
+                    <select id="ilce-filter">
+                        <option value="all">Tüm Liste</option>
+                    </select>
+                </div>
+
+                <div id="summary-card" class="control-group" style="font-size: 0.85rem; line-height: 1.8;">
+                    <div style="font-weight: 700; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">📊 ANALİTİK ÖZET</div>
+                    <div id="stat-total">Toplam: -</div>
+                    <div id="stat-avg">Ortalama: -</div>
+                    <div id="stat-match">Eşleşme: %-</div>
+                </div>
+
+                <div class="control-group">
+                    <label>Eşleşme Dosyası (.json)</label>
+                    <select id="overlay-mapping-select-static"></select>
+                    <div id="selected-mapping-info" style="font-size:0.65rem; color:var(--success); margin-top:4px; display:none;"></div>
+                </div>
+
+                <button id="re-upload" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 8px; color: var(--text-secondary); cursor: pointer; margin-top: 10px;">Yeni Excel Yükle</button>
+            </div>
+
+            <div id="welcome-msg" style="margin-top: 50px; text-align: center; color: var(--text-secondary);">
+                <div style="font-size: 4rem; opacity: 0.1; margin-bottom: 20px;">🛡️</div>
+                <p>Verileri haritaya yansıtmak ve analiz yapmak için bir Excel dosyası yükleyin.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="upload-overlay">
+            <div style="display: flex; flex-direction: column; gap: 20px; align-items: center; max-width: 500px; width: 90%;">
+                
+                <div style="width: 100%; background: var(--bg-secondary); padding: 25px; border-radius: 20px; border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="margin: 0 0 10px 0; color: #fff; font-size: 1.2rem;">1. Harita ve Eşleşme Seçimi</h2>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display:block; font-size:0.7rem; color:var(--accent); margin-bottom:5px; font-weight:600; text-transform:uppercase;">Çalışma Haritası (İl/Bölge)</label>
+                            <select id="overlay-city-select" style="background:#0f172a; border-color:rgba(59,130,246,0.3); font-weight:500;">
+                                <option value="">Yükleniyor...</option>
+                            </select>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display:block; font-size:0.7rem; color:var(--accent); margin-bottom:5px; font-weight:600; text-transform:uppercase;">Mahalle Eşleşme Dosyası (.json)</label>
+                            <select id="overlay-mapping-select" style="background:#0f172a; border-color:rgba(59,130,246,0.3); font-weight:500;">
+                                <option value="">Yükleniyor...</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; gap: 10px;">
+                            <a href="index_eslesme.html" id="edit-mappings-link" style="flex:1; text-decoration:none; text-align:center; padding:10px; font-size:0.75rem; background:rgba(59,130,246,0.1); border:1px solid var(--accent); color:var(--accent); border-radius:8px; cursor:pointer; font-weight:600; transition:all 0.2s;">
+                                🛠️ Eşleşmeleri Düzenle
+                            </a>
+                        </div>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); padding-top: 20px;">
+                        <h2 style="margin: 0 0 10px 0; color: #fff; font-size: 1.2rem;">2. Excel Verisini Yükle</h2>
+                        <div class="drop-zone" id="drop-zone" style="padding: 30px 20px;">
+                            <div style="font-size: 3rem; margin-bottom: 10px;">📄</div>
+                            <p style="color: var(--text-secondary); margin: 0; font-size: 0.85rem; font-weight:500;">Dosyayı buraya bırakın veya <br><span style="color:var(--accent)">tıklayıp seçin</span></p>
+                            <input type="file" id="file-input" style="display: none;" accept=".xls,.xlsx" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="legend">
+            <div id="legend-title" style="font-size: 0.75rem; font-weight: 800; margin-bottom: 12px; color: var(--accent); letter-spacing: 0.05em;">YOĞUNLUK SKALASI</div>
+            <div id="legend-body"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+
+<script>
+    // --- PWA Registration ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+
+    // --- State ---
+    let map, geoJsonLayer;
+    let geoData = null, mappingData = null, excelData = null;
+    let stats = { mahalle: {}, ilce: {} };
+    let config = { 
+        mode: 'single', view: 'mahalle', column: '', numerator: '', denominator: '', 
+        ilce: 'all', palette: 'GYR', legendSteps: 5, manualMax: null, city: '', mapping: '', 
+        useCountSingle: false, useCountNum: false, useCountDen: false
+    };
+
+    const PALETTES = {
+        'GYR': ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'],
+        'RYG': ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'],
+        'OCEAN': ['#eff6ff', '#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'],
+        'PURPLE': ['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#fb923c'],
+        'TRAFFIC': ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e']
+    };
+
+    async function init() {
+        showLoader(true);
+        map = L.map('map', { center: [37.15, 28.36], zoom: 9, zoomControl: false, attributionControl: false });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        
+        await Promise.all([
+            fetchMapSources(),
+            fetchMappingSources()
+        ]);
+        
+        setupEvents(); 
+        showLoader(false);
+    }
+    
+    async function fetchMapSources() {
+        try {
+            const sideSel = document.getElementById('city-select');
+            const overlaySel = document.getElementById('overlay-city-select');
+            const res = await fetch('maps.json?t=' + new Date().getTime());
+            const data = await res.json();
+            
+            let lastCity = localStorage.getItem('lastSavedCityPath');
+            
+            const fillSelect = (sel) => {
+                sel.innerHTML = '';
+                if (data.status === 'success' && data.maps.length > 0) {
+                    let mapExists = false;
+                    data.maps.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.path;
+                        opt.textContent = m.name;
+                        if (lastCity && m.path === lastCity) {
+                            opt.selected = true;
+                            mapExists = true;
+                        } else if (!lastCity && m.file.includes('Mugla')) {
+                             opt.selected = true;
+                             mapExists = true;
+                        }
+                        sel.appendChild(opt);
+                    });
+                    if (!lastCity || !mapExists) localStorage.setItem('lastSavedCityPath', sel.value);
+                    return sel.value;
+                }
+                return '';
+            };
+            
+            config.city = fillSelect(sideSel);
+            fillSelect(overlaySel);
+            overlaySel.value = config.city;
+            updateEditLink();
+        } catch(err) { console.error("Harita kaynakları yüklenemedi", err); }
+    }
+
+    async function fetchMappingSources() {
+        try {
+            const overlaySel = document.getElementById('overlay-mapping-select');
+            const sideSel = document.getElementById('overlay-mapping-select-static');
+            const res = await fetch('mappings.json?t=' + new Date().getTime());
+            const data = await res.json();
+            
+            let lastMapping = localStorage.getItem('lastSavedMappingPath');
+            
+            const fill = (sel) => {
+                if(!sel) return;
+                sel.innerHTML = '';
+                if (data.status === 'success' && data.files.length > 0) {
+                    data.files.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.path;
+                        opt.textContent = f.name;
+                        if (lastMapping && f.path === lastMapping) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                    return sel.value;
+                }
+            };
+            
+            config.mapping = fill(overlaySel);
+            fill(sideSel);
+            if(sideSel) sideSel.value = config.mapping;
+        } catch(err) { console.error("Eşleşme kaynakları yüklenemedi", err); }
+    }
+
+    function processExcel(json) {
+        excelData = json;
+        const columns = Object.keys(json[0]);
+        const numericCols = columns.filter(col => {
+            const key = col.toString().toUpperCase('tr-TR');
+            const whiteList = ['BRUSELLOZ', 'ÇİÇEK', 'VEBA', 'SEPTİSEMİ', 'ŞAP', 'AŞI', 'HAYVAN', 'SAYI'];
+            if (whiteList.some(w => key.includes(w))) return true;
+            const forbiddenKeys = ['TC', 'KİMLİK', 'KIMLIK', 'VERGİ', 'VKN', 'IDENTIFIER', 'PASAPORT'];
+            if (forbiddenKeys.some(f => key.includes(f))) return false;
+            let hasNumber = false;
+            for(let i=0; i < Math.min(json.length, 50); i++) {
+                const val = json[i][col]; if (!val) continue;
+                const parsed = parseFloat(val.toString().replace(/\./g, '').replace(',', '.'));
+                if (!isNaN(parsed) && parsed < 1000000000) { hasNumber = true; break; }
+            }
+            return hasNumber;
+        });
+        
+        if (numericCols.length === 0) { alert("Sayısal veri bulunamadı!"); return; }
+        fillSelects(['col-single', 'col-numerator', 'col-denominator'], numericCols);
+        const mCol = columns.find(c => { const k = c.toString().toUpperCase('tr-TR'); return k.includes('MAHALLE') || k === 'AD' || k.includes('KÖY'); });
+        const iCol = columns.find(c => { const k = c.toString().toUpperCase('tr-TR'); return k.includes('İLÇE') || k.includes('ILCE'); });
+
+        stats.mahalle = {}; stats.ilce = {}; stats.matchedCount = 0;
+        json.forEach(row => {
+            let mNameRaw = row[mCol]?.toString() || "";
+            let iNameRaw = row[iCol]?.toString() || "";
+            let mName = mNameRaw.toLocaleUpperCase('tr-TR').replace(/\s+(MAHALLESİ|MAHALLE|KÖYÜ|KÖY)\b/g, '').replace(/\s+MAH\./g, '').trim();
+            let iName = iNameRaw.toLocaleUpperCase('tr-TR').trim();
+            if (mName.endsWith(" MAHALLESİ")) mName = mName.replace(" MAHALLESİ", "");
+
+            let match = null;
+            if (iName && mappingData.eslesmeler[`${iName}|${mName}`]) match = mappingData.eslesmeler[`${iName}|${mName}`];
+            else match = Object.values(mappingData.eslesmeler).find(e => e.sistemMahalle === mName);
+            
+            if (match) {
+                stats.matchedCount++; const ilceKey = match.sistemIlce;
+                if (!stats.ilce[ilceKey]) stats.ilce[ilceKey] = { total: 0, count: 0, mCount: 0, sums: {}, counts: {} };
+                stats.ilce[ilceKey].count++;
+                match.eslesmeler.forEach(id => {
+                    if (!stats.mahalle[id]) stats.mahalle[id] = { total: 0, count: 0, sums: {}, counts: {}, sistemMahalle: match.sistemMahalle };
+                    const mObj = stats.mahalle[id];
+                    numericCols.forEach(col => {
+                        const val = parseFloat(row[col]?.toString().replace(/\./g, '').replace(',', '.')) || 0;
+                        mObj.sums[col] = (mObj.sums[col] || 0) + val;
+                        stats.ilce[ilceKey].sums[col] = (stats.ilce[ilceKey].sums[col] || 0) + val;
+                        if (val !== 0) {
+                            mObj.counts[col] = (mObj.counts[col] || 0) + 1;
+                            stats.ilce[ilceKey].counts[col] = (stats.ilce[ilceKey].counts[col] || 0) + 1;
+                        }
+                    });
+                    mObj.count++;
+                });
+            }
+        });
+        refreshVisuals();
+        document.getElementById('upload-overlay').classList.add('hidden');
+        document.getElementById('data-controls').classList.remove('hidden');
+        document.getElementById('welcome-msg').classList.add('hidden');
+    }
+
+    async function handleFile(file) {
+        if (!file && !excelData) return;
+        showLoader(true);
+        try {
+            const mapUrl = document.getElementById('overlay-city-select').value;
+            const mappingUrl = document.getElementById('overlay-mapping-select').value;
+            const [rg, rm] = await Promise.all([
+                fetch(mapUrl + '?t=' + new Date().getTime()).then(r => r.json()),
+                fetch(mappingUrl + '?t=' + new Date().getTime()).then(r => r.json())
+            ]);
+            geoData = rg; mappingData = rm;
+            
+            const ilceler = [...new Set(geoData.features.map(f => f.properties.ILCEAD))].sort((a,b) => String(a).localeCompare(String(b), 'tr'));
+            const ilceSel = document.getElementById('ilce-filter');
+            ilceSel.innerHTML = '<option value="all">Tüm Liste</option>';
+            ilceler.forEach(i => { if(i) { const o = document.createElement('option'); o.value = i; o.textContent = i; ilceSel.appendChild(o); } });
+            
+            renderMap();
+            if (file) {
+                const reader = new FileReader(); 
+                reader.onload = (e) => { 
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' }); 
+                    excelData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+                    processExcel(excelData); 
+                };
+                reader.readAsArrayBuffer(file);
+            } else if (excelData) processExcel(excelData);
+        } catch(err) { alert("Veri yüklenemedi!"); console.error(err); }
+        finally { showLoader(false); }
+    }
+
+    function calculateValue(dataObj) {
+        if (!dataObj) return 0;
+        if (config.mode === 'single') return config.useCountSingle ? (dataObj.counts[config.column] || 0) : (dataObj.sums[config.column] || 0);
+        const num = config.useCountNum ? (dataObj.counts[config.numerator] || 0) : (dataObj.sums[config.numerator] || 0);
+        const den = config.useCountDen ? (dataObj.counts[config.denominator] || 0) : (dataObj.sums[config.denominator] || 0);
+        return den === 0 ? 0 : (num / den) * 100;
+    }
+
+    function refreshVisuals() {
+        if(!geoData) return;
+        const steps = parseInt(config.legendSteps);
+        let activeItems = (config.view === 'mahalle') ? Object.entries(stats.mahalle).map(([id, m]) => ({ id, val: calculateValue(m), ilce: getIlceById(id) })) : Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
+        
+        if (config.ilce !== 'all') activeItems = activeItems.filter(x => x.ilce === config.ilce);
+        const vals = activeItems.map(x => x.val).filter(v => v > 0);
+        const min = vals.length ? Math.min(...vals) : 0;
+        let max = vals.length ? Math.max(...vals) : 0;
+
+        if (document.getElementById('manual-max-toggle').checked) {
+            max = parseFloat(document.getElementById('max-limit-slider').value);
+        } else {
+            document.getElementById('max-limit-slider').value = max;
+            document.getElementById('max-limit-val').value = Math.ceil(max);
+        }
+
+        geoJsonLayer.eachLayer(layer => {
+            const p = layer.feature.properties;
+            const isVisible = (config.ilce === 'all' || p.ILCEAD === config.ilce);
+            if (!isVisible) { layer.setStyle({ opacity: 0, fillOpacity: 0, interactive: false }); return; }
+            const val = (config.view === 'mahalle') ? calculateValue(stats.mahalle[p.KIMLIKNO]) : calculateValue(stats.ilce[p.ILCEAD]);
+            layer.setStyle({ fillColor: getColor(val, min, max, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#444', weight: 0.5, opacity: 1, interactive: true });
+        });
+        renderLegend(min, max, steps);
+        updateSummaryCard();
+    }
+
+    function getColor(v, min, max, steps) {
+        if (v === 0 || isNaN(v)) return 'rgba(203, 213, 225, 0.4)';
+        const p = Math.min(1, (v - min) / (max - min || 1));
+        const colors = PALETTES[config.palette];
+        return colors[Math.min(Math.floor(p * colors.length), colors.length - 1)];
+    }
+
+    function updateSummaryCard() {
+        if (!excelData) return;
+        let activeItems = (config.view === 'mahalle') ? Object.entries(stats.mahalle).map(([id, m]) => ({ id, val: calculateValue(m), ilce: getIlceById(id) })) : Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
+        if (config.ilce !== 'all') activeItems = activeItems.filter(x => x.ilce === config.ilce);
+        const vals = activeItems.map(x => x.val);
+        const total = vals.reduce((a, b) => a + b, 0);
+        document.getElementById('stat-total').textContent = `Toplam: ${total.toLocaleString('tr')}`;
+        document.getElementById('stat-avg').textContent = `Ortalama: ${(total / (vals.length || 1)).toLocaleString('tr')}`;
+        document.getElementById('stat-match').textContent = `Eşleşme: %${((stats.matchedCount / excelData.length) * 100).toFixed(1)}`;
+    }
+
+    function renderLegend(min, max, steps) {
+        const body = document.getElementById('legend-body'); body.innerHTML = '';
+        const stepSize = (max - min) / steps;
+        for (let i = 0; i < steps; i++) {
+            const s = min + (i * stepSize), e = min + ((i+1) * stepSize);
+            const color = getColor(s + 0.1, min, max, steps);
+            body.innerHTML += `<div class="legend-item"><div class="color-box" style="background:${color}"></div><span>${s.toFixed(0)} - ${e.toFixed(0)}</span></div>`;
+        }
+    }
+
+    function renderMap() {
+        if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+        geoJsonLayer = L.geoJSON(geoData, {
+            style: { weight: 0.5, color: '#475569', fillOpacity: 0.1, fillColor: '#ccc' },
+            onEachFeature: (f, l) => { l.on('click', (e) => showDetails(f.properties, e.latlng)); }
+        }).addTo(map);
+    }
+
+    function showDetails(props, latlng) {
+        const data = (config.view === 'mahalle') ? stats.mahalle[props.KIMLIKNO] : stats.ilce[props.ILCEAD];
+        let content = `<div style="font-weight:700; border-bottom:2px solid var(--accent); padding-bottom:5px; margin-bottom:10px;">${props.AD || props.ILCEAD}</div>`;
+        if (data) {
+            content += `<table class="popup-table">`;
+            for (let [k, v] of Object.entries(data.sums)) {
+                content += `<tr><td>${k}</td><td style="text-align:right"><b>${v.toLocaleString('tr')}</b></td></tr>`;
+            }
+            content += `</table>`;
+        } else content += `<div>Veri bulunamadı.</div>`;
+        L.popup().setLatLng(latlng).setContent(content).openOn(map);
+    }
+
+    function fillSelects(ids, options) {
+        ids.forEach(id => {
+            const el = document.getElementById(id); el.innerHTML = '';
+            options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.textContent = opt; el.appendChild(o); });
+        });
+        config.column = document.getElementById('col-single').value;
+        config.numerator = document.getElementById('col-numerator').value;
+        config.denominator = document.getElementById('col-denominator').value;
+    }
+
+    function getIlceById(id) { return geoData.features.find(f => f.properties.KIMLIKNO == id)?.properties.ILCEAD || ""; }
+    
+    function setupEvents() {
+        document.querySelectorAll('.btn-toggle-group button').forEach(btn => {
+            btn.onclick = (e) => {
+                const grp = e.target.parentElement.id; const val = e.target.dataset.mode || e.target.dataset.view;
+                document.querySelectorAll(`#${grp} button`).forEach(b => b.classList.remove('active')); e.target.classList.add('active');
+                if (grp === 'mode-toggle') { 
+                    config.mode = val; 
+                    document.getElementById('single-col-group').classList.toggle('hidden', val !== 'single');
+                    document.getElementById('percent-col-group').classList.toggle('hidden', val !== 'percent');
+                } else config.view = val;
+                refreshVisuals();
+            };
+        });
+        document.getElementById('col-single').onchange = (e) => { config.column = e.target.value; refreshVisuals(); };
+        document.getElementById('city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('overlay-city-select').value = e.target.value; handleFile(null); };
+        document.getElementById('overlay-city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('city-select').value = e.target.value; };
+        
+        document.getElementById('count-single-toggle').onchange = (e) => { config.useCountSingle = e.target.checked; refreshVisuals(); };
+        document.getElementById('count-num-toggle').onchange = (e) => { config.useCountNum = e.target.checked; refreshVisuals(); };
+        document.getElementById('count-den-toggle').onchange = (e) => { config.useCountDen = e.target.checked; refreshVisuals(); };
+
+        const dZ = document.getElementById('drop-zone'), fI = document.getElementById('file-input');
+        dZ.onclick = () => fI.click();
+        fI.onchange = (e) => handleFile(e.target.files[0]);
+        document.getElementById('re-upload').onclick = () => document.getElementById('upload-overlay').classList.remove('hidden');
+    }
+
+    function showLoader(s) { document.getElementById('loader').style.display = s ? 'grid' : 'none'; }
+    function updateEditLink() {
+        const link = document.getElementById('edit-mappings-link');
+        if (link && config.city) link.href = `index_eslesme.html?city=${encodeURIComponent(config.city)}`;
+    }
+
+    init();
+</script>
+</body>
+</html>

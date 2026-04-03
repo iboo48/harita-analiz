@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Birleşik Eşleştirme ve Harita Yönetimi (GitHub Edition)</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  
+  <style>
+    :root {
+        --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-card: #0f172a; --bg-card-hover: #334155;
+        --accent: #3b82f6; --accent-hover: #2563eb; --text-primary: #f8fafc; --text-secondary: #94a3b8;
+        --text-muted: #64748b; --border: rgba(51, 65, 85, 0.5); --border-light: rgba(148, 163, 184, 0.2);
+        --success: #22c55e; --success-bg: rgba(34, 197, 94, 0.1); --warning: #eab308;
+        --warning-bg: rgba(234, 179, 8, 0.1); --danger: #ef4444; --danger-bg: rgba(239, 68, 68, 0.1);
+        --active-row-bg: rgba(59, 130, 246, 0.15); --active-row-border: #3b82f6;
+        --radius: 12px; --radius-sm: 8px; --transition: all 0.2s ease;
+    }
+
+    body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; }
+    
+    #left-panel { width: 45%; min-width: 450px; max-width: 600px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--bg-secondary); z-index: 10; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+    #right-panel { flex: 1; position: relative; display: flex; flex-direction: column; background: var(--bg-primary); }
+    #map { flex: 1; background: #0f172a; width: 100%; }
+    
+    .panel-header { padding: 16px 20px; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .panel-header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+    
+    .scrollable { overflow-y: auto; padding: 16px 20px; flex: 1; }
+    .scrollable::-webkit-scrollbar { width: 6px; }
+    .scrollable::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    
+    .stat-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; flex: 1; min-width: 70px; text-align: center; }
+    .stat-card .val { font-size: 18px; font-weight: 700; }
+    .stat-card .lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .stat-card.ok .val { color: var(--success); } .stat-card.warn .val { color: var(--warning); } .stat-card.err .val { color: var(--danger); }
+    
+    select, input[type="text"] { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; font-family: inherit; }
+    
+    .btn { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); padding: 8px 14px; font-size: 13px; cursor: pointer; transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; }
+    .btn:hover { background: var(--bg-card-hover); border-color: var(--text-muted); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+    
+    .match-list { display: flex; flex-direction: column; gap: 8px; }
+    .match-row { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: var(--transition); position: relative; }
+    .match-row.active { background: var(--active-row-bg); border-color: var(--active-row-border); border-left: 4px solid var(--accent); }
+    .match-row.onaylandi { border-left: 3px solid var(--success); }
+    .match-row.bekliyor { border-left: 3px solid var(--warning); }
+    .match-row.eslesmedi { border-left: 3px solid var(--danger); }
+    
+    .kno-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .kno-tag { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 99px; padding: 4px 10px; font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+    .kno-tag .remove { color: var(--danger); cursor: pointer; font-weight: bold; }
+    
+    .map-overlay-top { position: absolute; top: 15px; left: 60px; z-index: 1000; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); backdrop-filter: blur(5px); display: flex; gap: 10px; align-items: center; }
+    
+    .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .filter-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 99px; color: var(--text-secondary); padding: 5px 12px; font-size: 12px; cursor: pointer; }
+    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+    .loader { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid var(--accent); border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div id="left-panel">
+    <div class="panel-header">
+      <h1 style="display:flex; align-items:center; gap:8px;">🗂️ Eşleştirme <span style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px;">STATIC</span></h1>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button class="btn" onclick="document.getElementById('file-upload-input').click()">📥 Excel</button>
+        <button class="btn" onclick="loadServerJSON()">📂 Liste</button>
+        <button class="btn" onclick="document.getElementById('local-json-input').click()">📁 Yerel JSON</button>
+        <input type="file" id="file-upload-input" accept=".xlsx,.xls" onchange="handleExcelUpload(event)" style="display:none;">
+        <input type="file" id="local-json-input" accept=".json" onchange="handleLocalJSON(event)" style="display:none;">
+      </div>
+      <div style="width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+        <a href="index.html" class="btn btn-primary" style="text-decoration:none; width:100%; justify-content:center; box-sizing: border-box;">🗺️ Harita Analizine Geri Dön</a>
+      </div>
+    </div>
+    
+    <div class="scrollable">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <input type="text" id="search-input" placeholder="Mahalle veya İlçe ara..." style="flex:1" oninput="renderList()">
+        <select id="ilce-filter" onchange="renderList()">
+          <option value="">Tüm İlçeler</option>
+        </select>
+      </div>
+      
+      <div class="filter-bar">
+        <button class="filter-btn active" data-f="all" onclick="setFilter('all', this)">Tümü</button>
+        <button class="filter-btn" data-f="onayli" onclick="setFilter('onayli', this)">✅ Onaylı</button>
+        <button class="filter-btn" data-f="bekleyen" onclick="setFilter('bekleyen', this)">⚠️ Bekleyen</button>
+        <button class="filter-btn" data-f="eslesmeyen" onclick="setFilter('eslesmeyen', this)">❌ Eşleşmedi</button>
+      </div>
+
+      <div class="stat-row" id="stats"></div>
+      <div class="match-list" id="match-list">
+        <div style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">Lütfen veri yükleyin.</div>
+      </div>
+    </div>
+    
+    <div class="panel-header" style="background:#0f172a; border-top:1px solid var(--border);">
+      <input type="text" id="dl-filename" placeholder="eslesme" style="width:150px;">
+      <button class="btn btn-primary" onclick="downloadJSON()">💾 JSON İndir</button>
+    </div>
+  </div>
+
+  <div id="right-panel">
+    <div class="map-overlay-top">
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <label style="font-size:10px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Harita Verisi (GeoJSON)</label>
+        <select id="map-source-select" style="min-width: 250px;" onchange="loadSelectedMap()">
+          <option value="">Yükleniyor...</option>
+        </select>
+      </div>
+      <div id="map-loader" class="loader" style="display:none; margin-left:10px;"></div>
+    </div>
+    <div id="map"></div>
+  </div>
+
+<script>
+let map, geoJsonLayer, geoData = null, geoIndex = {}, eslesmeData = { eslesmeler: {}, geoEslesmeyenler: [], metaveriler: {} }, activeRowKey = null, currentFilter = 'all';
+
+const COLORS = { matched: '#22c55e', unmatched: '#ef4444' };
+
+document.addEventListener("DOMContentLoaded", () => {
+    initMap();
+    fetchMapSources();
+});
+
+function initMap() {
+    map = L.map('map', { zoomControl: false }).setView([37.215, 28.363], 9);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png').addTo(map);
+}
+
+async function fetchMapSources() {
+    try {
+        const res = await fetch('maps.json?t=' + new Date().getTime());
+        const data = await res.json();
+        const sel = document.getElementById('map-source-select');
+        sel.innerHTML = '';
+        data.maps.forEach(m => {
+            const opt = new Option(m.name, m.path);
+            sel.add(opt);
+        });
+        loadSelectedMap();
+    } catch(err) { console.error(err); }
+}
+
+async function loadSelectedMap() {
+    const path = document.getElementById('map-source-select').value;
+    if (!path) return;
+    document.getElementById('map-loader').style.display = 'inline-block';
+    try {
+        const res = await fetch(path);
+        geoData = await res.json();
+        geoIndex = {};
+        geoData.features.forEach(f => {
+            const p = f.properties;
+            const ad = p.AD || p.name || "Bilinmiyor", ilce = p.ILCEAD || p.ilce || "Bilinmiyor", kno = p.KIMLIKNO || p.id || Math.random();
+            f.properties.STD_AD = ad; f.properties.STD_ILCE = ilce; f.properties.STD_KNO = kno;
+            geoIndex[kno] = { ad, ilce, kno };
+        });
+        renderMap();
+        renderList();
+    } catch(err) { console.error(err); }
+    finally { document.getElementById('map-loader').style.display = 'none'; }
+}
+
+function renderMap() {
+    if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+    const assignedIds = new Set();
+    Object.values(eslesmeData.eslesmeler).forEach(e => (e.eslesmeler || []).forEach(id => assignedIds.add(String(id))));
+    geoJsonLayer = L.geoJSON(geoData, {
+        style: (f) => ({ fillColor: assignedIds.has(String(f.properties.STD_KNO)) ? COLORS.matched : COLORS.unmatched, weight: 1, fillOpacity: 0.5, color: '#444' }),
+        onEachFeature: (f, l) => { l.on('click', (e) => handleMapClick(f, e)); }
+    }).addTo(map);
+    if (geoData.features.length) map.fitBounds(geoJsonLayer.getBounds());
+}
+
+function handleMapClick(f, e) {
+    const kno = String(f.properties.STD_KNO);
+    const match = Object.values(eslesmeData.eslesmeler).find(v => v.eslesmeler?.includes(kno));
+    let html = `<b>${f.properties.STD_AD}</b><br>${f.properties.STD_ILCE}<br>`;
+    if (activeRowKey && !match) html += `<button onclick="commitAdd('${kno}')" style="margin-top:10px; width:100%; cursor:pointer;">Ekle</button>`;
+    else if (match) html += `<i>${match.sistemMahalle} ile eşli</i>`;
+    L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+}
+
+window.commitAdd = (kno) => {
+    eslesmeData.eslesmeler[activeRowKey].eslesmeler.push(kno);
+    renderMap(); renderList(); updateStats(); map.closePopup();
+};
+
+async function loadServerJSON() {
+    const res = await fetch('mappings.json');
+    const data = await res.json();
+    const list = data.files.map((f, i) => `${i+1}. ${f.name}`).join('\n');
+    const idx = prompt("Dosya seçin:\n" + list, "1");
+    if (idx && data.files[idx-1]) {
+        const fres = await fetch(data.files[idx-1].path);
+        eslesmeData = await fres.json();
+        renderMap(); renderList(); updateStats();
+    }
+}
+
+function handleExcelUpload(e) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        processExcel(json);
+    };
+    reader.readAsArrayBuffer(e.target.files[0]);
+}
+
+function processExcel(json) {
+    const cols = Object.keys(json[0]);
+    const mCol = cols.find(c => c.toUpperCase().includes('MAHALLE'));
+    json.forEach(row => {
+        const name = row[mCol]?.toString().toUpperCase('tr-TR');
+        if (name) eslesmeData.eslesmeler[name] = { sistemMahalle: name, sistemIlce: "Excel", eslesmeler: [], manuelOnaylandi: false };
+    });
+    renderList(); updateStats();
+}
+
+function handleLocalJSON(e) {
+    const reader = new FileReader();
+    reader.onload = (ev) => { eslesmeData = JSON.parse(ev.target.result); renderMap(); renderList(); updateStats(); };
+    reader.readAsText(e.target.files[0]);
+}
+
+function renderList() {
+    const cont = document.getElementById('match-list');
+    cont.innerHTML = Object.entries(eslesmeData.eslesmeler).map(([k, v]) => `
+      <div class="match-row ${activeRowKey===k?'active':''}" onclick="activeRowKey='${k}'; renderList();">
+        <b>${v.sistemMahalle}</b>
+        <div class="kno-tags">${(v.eslesmeler||[]).map(id => `<span class="kno-tag">${id}</span>`).join('')}</div>
+      </div>
+    `).join('');
+}
+
+function updateStats() {
+    const vals = Object.values(eslesmeData.eslesmeler);
+    document.getElementById('stats').innerHTML = `<div class="stat-card"><div class="val">${vals.length}</div><div class="lbl">TOPLAM</div></div>`;
+}
+
+function downloadJSON() {
+    const blob = new Blob([JSON.stringify(eslesmeData, null, 2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'eslesme.json'; a.click();
+}
+
+function setFilter(f, btn) { currentFilter = f; renderList(); }
+</script>
+</body>
+</html>
