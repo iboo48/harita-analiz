@@ -275,6 +275,9 @@
             <div id="welcome-msg" style="margin-top: 50px; text-align: center; color: var(--text-secondary);">
                 <div style="font-size: 4rem; opacity: 0.1; margin-bottom: 20px;">🛡️</div>
                 <p>Verileri haritaya yansıtmak ve analiz yapmak için bir Excel dosyası yükleyin.</p>
+                <button id="pwa-install-btn" style="display:none; margin: 20px auto; padding: 12px 25px; background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent); color: var(--accent); border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);">
+                    📥 Uygulama Olarak Yükle
+                </button>
             </div>
         </div>
     </div>
@@ -332,10 +335,29 @@
 <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 
 <script>
-    // --- PWA Registration ---
+    // --- PWA Registration & Install Prompt ---
+    let deferredPrompt;
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
     }
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'block';
+            installBtn.addEventListener('click', () => {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        installBtn.style.display = 'none';
+                    }
+                    deferredPrompt = null;
+                });
+            });
+        }
+    });
 
     // --- State ---
     let map, geoJsonLayer;
@@ -563,21 +585,25 @@
         if (config.ilce !== 'all') activeItems = activeItems.filter(x => x.ilce === config.ilce);
         const vals = activeItems.map(x => x.val).filter(v => v > 0);
         const min = vals.length ? Math.min(...vals) : 0;
-        let max = vals.length ? Math.max(...vals) : 0;
+        let maxOrig = vals.length ? Math.max(...vals) : 0;
 
+        let max;
         if (document.getElementById('manual-max-toggle').checked) {
             max = parseFloat(document.getElementById('max-limit-slider').value);
         } else {
+            max = maxOrig;
             document.getElementById('max-limit-slider').value = max;
             document.getElementById('max-limit-val').value = Math.ceil(max);
         }
+        
+        if (config.mode === 'percent' && max > 100) max = 100;
 
         geoJsonLayer.eachLayer(layer => {
             const p = layer.feature.properties;
             const isVisible = (config.ilce === 'all' || p.ILCEAD === config.ilce);
             if (!isVisible) { layer.setStyle({ opacity: 0, fillOpacity: 0, interactive: false }); return; }
             const val = (config.view === 'mahalle') ? calculateValue(stats.mahalle[p.KIMLIKNO]) : calculateValue(stats.ilce[p.ILCEAD]);
-            layer.setStyle({ fillColor: getColor(val, min, max, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#444', weight: 0.5, opacity: 1, interactive: true });
+            layer.setStyle({ fillColor: getColor(val, min, max, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#475569', weight: config.view === 'ilce' ? 0.3 : 0.7, opacity: 1, interactive: true });
         });
         renderLegend(min, max, steps);
         updateSummaryCard();
@@ -585,9 +611,15 @@
 
     function getColor(v, min, max, steps) {
         if (v === 0 || isNaN(v)) return 'rgba(203, 213, 225, 0.4)';
-        const p = Math.min(1, (v - min) / (max - min || 1));
-        const colors = PALETTES[config.palette];
-        return colors[Math.min(Math.floor(p * colors.length), colors.length - 1)];
+        if (config.mode === 'percent' && max > 100) max = 100;
+        const range = max - min;
+        const paletteColors = PALETTES[config.palette];
+        if (range <= 0) return paletteColors[paletteColors.length - 1]; // Fark yoksa en yüksek renk veya en koyu
+        
+        const p = Math.min(1, (v - min) / range);
+        const index = Math.floor(p * steps);
+        const colorIndex = Math.floor((index / steps) * paletteColors.length);
+        return paletteColors[Math.min(colorIndex, paletteColors.length - 1)];
     }
 
     function updateSummaryCard() {
@@ -596,18 +628,25 @@
         if (config.ilce !== 'all') activeItems = activeItems.filter(x => x.ilce === config.ilce);
         const vals = activeItems.map(x => x.val);
         const total = vals.reduce((a, b) => a + b, 0);
-        document.getElementById('stat-total').textContent = `Toplam: ${total.toLocaleString('tr')}`;
-        document.getElementById('stat-avg').textContent = `Ortalama: ${(total / (vals.length || 1)).toLocaleString('tr')}`;
-        document.getElementById('stat-match').textContent = `Eşleşme: %${((stats.matchedCount / excelData.length) * 100).toFixed(1)}`;
+        document.getElementById('stat-total').innerHTML = `Toplam: <b style="color:#fff">${total.toLocaleString('tr', {maximumFractionDigits: 2})}${config.mode==='percent'?'%':''}</b>`;
+        document.getElementById('stat-avg').innerHTML = `Ortalama: <b style="color:#fff">${(total / (vals.length || 1)).toLocaleString('tr', {maximumFractionDigits: 2})}${config.mode==='percent'?'%':''}</b>`;
+        document.getElementById('stat-match').innerHTML = `Eşleşme: <b style="color:#fff">%${((stats.matchedCount / excelData.length) * 100).toFixed(1)}</b>`;
     }
 
     function renderLegend(min, max, steps) {
         const body = document.getElementById('legend-body'); body.innerHTML = '';
-        const stepSize = (max - min) / steps;
+        const nullItem = document.createElement('div'); nullItem.className = 'legend-item';
+        nullItem.innerHTML = `<div class="color-box" style="background:rgba(203, 213, 225, 0.4)"></div> <span>Veri Yok / Sabit</span>`;
+        body.appendChild(nullItem);
+        
+        const paletteColors = PALETTES[config.palette];
+        const r = max - min, stepSize = r / steps;
         for (let i = 0; i < steps; i++) {
             const s = min + (i * stepSize), e = min + ((i+1) * stepSize);
-            const color = getColor(s + 0.1, min, max, steps);
-            body.innerHTML += `<div class="legend-item"><div class="color-box" style="background:${color}"></div><span>${s.toFixed(0)} - ${e.toFixed(0)}</span></div>`;
+            const colorIndex = Math.floor((i / steps) * paletteColors.length);
+            const color = paletteColors[Math.min(colorIndex, paletteColors.length - 1)];
+            
+            body.innerHTML += `<div class="legend-item"><div class="color-box" style="background:${color}"></div><span>${s.toLocaleString('tr', {maximumFractionDigits: 0})}${config.mode === 'percent' ? '%' : ''} - ${e.toLocaleString('tr', {maximumFractionDigits: 0})}${config.mode === 'percent' ? '%' : ''}</span></div>`;
         }
     }
 
