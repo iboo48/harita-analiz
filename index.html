@@ -578,34 +578,40 @@
     }
 
     function refreshVisuals() {
-        if(!geoData) return;
-        const steps = parseInt(config.legendSteps);
-        let activeItems = (config.view === 'mahalle') ? Object.entries(stats.mahalle).map(([id, m]) => ({ id, val: calculateValue(m), ilce: getIlceById(id) })) : Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
+        const view = config.view; const targetI = config.ilce; const steps = parseInt(config.legendSteps);
+        let activeItems = [];
+        if (view === 'mahalle') activeItems = Object.entries(stats.mahalle).map(([id, m]) => ({ id, val: calculateValue(m), ilce: getIlceById(id) }));
+        else activeItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
         
-        if (config.ilce !== 'all') activeItems = activeItems.filter(x => x.ilce === config.ilce);
+        if (targetI !== 'all') activeItems = activeItems.filter(x => x.ilce === targetI);
+        
         const vals = activeItems.map(x => x.val).filter(v => v > 0);
-        const min = vals.length ? Math.min(...vals) : 0;
-        let maxOrig = vals.length ? Math.max(...vals) : 0;
-
-        let max;
-        if (document.getElementById('manual-max-toggle').checked) {
-            max = parseFloat(document.getElementById('max-limit-slider').value);
-        } else {
-            max = maxOrig;
-            document.getElementById('max-limit-slider').value = max;
-            document.getElementById('max-limit-val').value = Math.ceil(max);
-        }
+        const min = vals.length ? Math.min(...vals) : 0, maxOrig = vals.length ? Math.max(...vals) : 0;
         
-        if (config.mode === 'percent' && max > 100) max = 100;
+        const isManual = document.getElementById('manual-max-toggle').checked;
+        const slider = document.getElementById('max-limit-slider');
+        
+        if (!isManual) {
+            config.manualMax = maxOrig;
+            slider.value = maxOrig;
+            document.getElementById('max-limit-val').value = Math.ceil(maxOrig);
+        } else {
+            config.manualMax = parseFloat(slider.value);
+            document.getElementById('max-limit-val').value = Math.ceil(config.manualMax);
+        }
+
+        let maxLegend = config.manualMax !== null ? config.manualMax : maxOrig;
+        if (config.mode === 'percent' && maxLegend > 100) maxLegend = 100;
 
         geoJsonLayer.eachLayer(layer => {
-            const p = layer.feature.properties;
-            const isVisible = (config.ilce === 'all' || p.ILCEAD === config.ilce);
+            const props = layer.feature.properties; const id = props.KIMLIKNO, ilce = props.ILCEAD;
+            const isVisible = (targetI === 'all' || ilce === targetI);
             if (!isVisible) { layer.setStyle({ opacity: 0, fillOpacity: 0, interactive: false }); return; }
-            const val = (config.view === 'mahalle') ? calculateValue(stats.mahalle[p.KIMLIKNO]) : calculateValue(stats.ilce[p.ILCEAD]);
-            layer.setStyle({ fillColor: getColor(val, min, max, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#475569', weight: config.view === 'ilce' ? 0.3 : 0.7, opacity: 1, interactive: true });
+            
+            const val = (view === 'mahalle') ? calculateValue(stats.mahalle[id]) : calculateValue(stats.ilce[ilce]);
+            layer.setStyle({ fillColor: getColor(val, min, maxLegend, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#475569', weight: view === 'ilce' ? 0.3 : 0.7, opacity: 1, interactive: true });
         });
-        renderLegend(min, max, steps);
+        renderLegend(min, maxLegend, steps);
         updateSummaryCard();
     }
 
@@ -614,7 +620,7 @@
         if (config.mode === 'percent' && max > 100) max = 100;
         const range = max - min;
         const paletteColors = PALETTES[config.palette];
-        if (range <= 0) return paletteColors[paletteColors.length - 1]; // Fark yoksa en yüksek renk veya en koyu
+        if (range <= 0) return paletteColors[paletteColors.length - 1];
         
         const p = Math.min(1, (v - min) / range);
         const index = Math.floor(p * steps);
@@ -653,22 +659,51 @@
     function renderMap() {
         if (geoJsonLayer) map.removeLayer(geoJsonLayer);
         geoJsonLayer = L.geoJSON(geoData, {
-            style: { weight: 0.5, color: '#475569', fillOpacity: 0.1, fillColor: '#ccc' },
-            onEachFeature: (f, l) => { l.on('click', (e) => showDetails(f.properties, e.latlng)); }
+            style: { weight: 0.5, color: '#475569', fillOpacity: 0.15, fillColor: 'rgba(203, 213, 225, 0.3)' },
+            onEachFeature: (f, l) => {
+                l.on({
+                    click: (e) => { if (e.target.options.opacity !== 0) showDetails(e.target.feature.properties, e.latlng); }
+                });
+            }
         }).addTo(map);
     }
 
     function showDetails(props, latlng) {
-        const data = (config.view === 'mahalle') ? stats.mahalle[props.KIMLIKNO] : stats.ilce[props.ILCEAD];
-        let content = `<div style="font-weight:700; border-bottom:2px solid var(--accent); padding-bottom:5px; margin-bottom:10px;">${props.AD || props.ILCEAD}</div>`;
+        const id = props.KIMLIKNO, ilce = props.ILCEAD;
+        const data = (config.view === 'mahalle') ? stats.mahalle[id] : stats.ilce[ilce];
+        
+        let matchInfo = null;
+        if (mappingData && mappingData.eslesmeler) {
+            matchInfo = Object.values(mappingData.eslesmeler).find(e => e.eslesmeler && (e.eslesmeler.includes(String(id)) || e.eslesmeler.includes(Number(id))));
+        }
+
+        let displayName = `<span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:4px;">${ilce}</span>`;
+        if (config.view === 'mahalle') {
+            displayName += props.AD;
+            if (data?.sistemMahalle) {
+                displayName += `<br><span style="font-size:0.85rem; color:var(--accent);">Sistem: ${data.sistemMahalle}</span>`;
+            } else if (matchInfo) {
+                displayName += `<br><span style="font-size:0.85rem; color:var(--accent);">Sistem: ${matchInfo.sistemMahalle}</span>`;
+            }
+        } else if (config.view === 'ilce') {
+            displayName = ilce;
+        }
+
+        let content = `<div style="font-weight:700; font-size:1.1rem; border-bottom:3px solid var(--accent); padding-bottom:10px; margin-bottom:15px; line-height:1.4">${displayName}</div>`;
+        
         if (data) {
+            if (config.mode === 'percent') {
+                const ratio = calculateValue(data);
+                content += `<div style="background:rgba(59,130,246,0.2); padding:10px; border-radius:8px; border:1px solid var(--accent); margin-bottom:15px; text-align:center"><div style="font-size:0.75rem; color:var(--text-secondary)">HESAPLANAN ORAN</div><div style="font-size:1.8rem; font-weight:800; color:#fff">%${ratio.toLocaleString('tr', {maximumFractionDigits: 2})}</div></div>`;
+            }
             content += `<table class="popup-table">`;
             for (let [k, v] of Object.entries(data.sums)) {
-                content += `<tr><td>${k}</td><td style="text-align:right"><b>${v.toLocaleString('tr', {maximumFractionDigits: 2})}</b></td></tr>`;
-                
                 const isSingleH = (config.mode === 'single' && k === config.column);
                 const isNumH = (config.mode === 'percent' && k === config.numerator);
                 const isDenH = (config.mode === 'percent' && k === config.denominator);
+                const isH = isSingleH || isNumH || isDenH;
+                
+                content += `<tr class="${isH ? 'highlight' : ''}"><td>${k}</td><td style="text-align:right"><b>${v.toLocaleString('tr', {maximumFractionDigits: 2})}</b></td></tr>`;
                 
                 if (isSingleH && config.useCountSingle) {
                     content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet bilgisi)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
@@ -681,8 +716,17 @@
                 }
             }
             content += `</table>`;
-        } else content += `<div>Veri bulunamadı.</div>`;
-        L.popup({className: 'custom-popup'}).setLatLng(latlng).setContent(content).openOn(map);
+        } else {
+            if (matchInfo) {
+                content += `<div style="background:rgba(249, 115, 22, 0.1); padding:10px; border-radius:8px; border:1px solid rgba(249, 115, 22, 0.3); text-align:center;">
+                                <div style="color:#fb923c; font-size:0.85rem; font-weight:700;">✓ Sistem Veritabanında Eşleşmiş</div>
+                                <div style="color:var(--text-secondary); font-size:0.75rem; margin-top:4px;">Ancak sağ veya üstteki Excel verinizde bu mahalleye ait bir kayıt veya sayısal değer (0 dahil) bulunamadı.</div>
+                            </div>`;
+            } else {
+                content += `<div style="color:#64748b; font-size:0.85rem">Sisteme henüz eşleştirilmemiş.</div>`;
+            }
+        }
+        L.popup({className: 'custom-popup', minWidth: 320}).setLatLng(latlng).setContent(content).openOn(map);
     }
 
     function fillSelects(ids, options) {
