@@ -132,6 +132,20 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .hidden { display: none !important; }
+
+        /* Mobil Uyumlu Akordiyon Menü İçin */
+        .mobile-toggle-btn {
+            display: none; background: rgba(59,130,246,0.2); border: 1px solid var(--accent); color: white;
+            padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700;
+        }
+        @media (max-width: 768px) {
+            #app { flex-direction: column; }
+            #sidebar { width: 100%; height: auto; max-height: 60vh; border-right: none; border-bottom: 2px solid var(--accent); z-index: 2002; display: flex; flex-direction: column; }
+            .sidebar-content { display: none; }
+            .sidebar-content.active { display: block; }
+            .mobile-toggle-btn { display: block; }
+            #map-container { flex: 1; min-height: 40vh; }
+        }
     </style>
 </head>
 <body>
@@ -142,7 +156,10 @@
     <div id="sidebar">
         <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;">
             <h1 style="font-size: 1rem;">🗺️ Harita Analizi</h1>
-            <span style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px; font-weight:700;">STATIC</span>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px; font-weight:700;">STATIC</span>
+                <button class="mobile-toggle-btn" id="mobile-toggle-menu">▼ Menü</button>
+            </div>
         </div>
         
         <div class="sidebar-content">
@@ -433,9 +450,16 @@
             if (forbiddenKeys.some(f => key.includes(f))) return false;
             let hasNumber = false;
             for(let i=0; i < Math.min(json.length, 50); i++) {
-                const val = json[i][col]; if (!val) continue;
-                const parsed = parseFloat(val.toString().replace(/\./g, '').replace(',', '.'));
-                if (!isNaN(parsed) && parsed < 1000000000) { hasNumber = true; break; }
+                let currentVal = json[i][col]; if (currentVal === undefined || currentVal === null || currentVal === "") continue;
+                let parsedVal;
+                if (typeof currentVal === 'number') {
+                    parsedVal = currentVal;
+                } else {
+                    let strVal = currentVal.toString().trim();
+                    if (strVal.includes(',')) parsedVal = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
+                    else parsedVal = parseFloat(strVal);
+                }
+                if (!isNaN(parsedVal) && parsedVal < 1000000000) { hasNumber = true; break; }
             }
             return hasNumber;
         });
@@ -465,7 +489,16 @@
                     if (!stats.mahalle[id]) stats.mahalle[id] = { total: 0, count: 0, sums: {}, counts: {}, sistemMahalle: match.sistemMahalle };
                     const mObj = stats.mahalle[id];
                     numericCols.forEach(col => {
-                        const val = parseFloat(row[col]?.toString().replace(/\./g, '').replace(',', '.')) || 0;
+                        let currentVal = row[col];
+                        let val = 0;
+                        if (typeof currentVal === 'number') {
+                            val = currentVal;
+                        } else if (currentVal !== undefined && currentVal !== null && currentVal !== "") {
+                            let strVal = currentVal.toString().trim();
+                            if (strVal.includes(',')) val = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
+                            else val = parseFloat(strVal);
+                        }
+                        val = val || 0;
                         mObj.sums[col] = (mObj.sums[col] || 0) + val;
                         stats.ilce[ilceKey].sums[col] = (stats.ilce[ilceKey].sums[col] || 0) + val;
                         if (val !== 0) {
@@ -592,11 +625,25 @@
         if (data) {
             content += `<table class="popup-table">`;
             for (let [k, v] of Object.entries(data.sums)) {
-                content += `<tr><td>${k}</td><td style="text-align:right"><b>${v.toLocaleString('tr')}</b></td></tr>`;
+                content += `<tr><td>${k}</td><td style="text-align:right"><b>${v.toLocaleString('tr', {maximumFractionDigits: 2})}</b></td></tr>`;
+                
+                const isSingleH = (config.mode === 'single' && k === config.column);
+                const isNumH = (config.mode === 'percent' && k === config.numerator);
+                const isDenH = (config.mode === 'percent' && k === config.denominator);
+                
+                if (isSingleH && config.useCountSingle) {
+                    content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet bilgisi)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+                }
+                if (isNumH && config.useCountNum) {
+                    content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet - Pay)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+                }
+                if (isDenH && config.useCountDen && (!isNumH || !config.useCountNum)) {
+                    content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet - Payda)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+                }
             }
             content += `</table>`;
         } else content += `<div>Veri bulunamadı.</div>`;
-        L.popup().setLatLng(latlng).setContent(content).openOn(map);
+        L.popup({className: 'custom-popup'}).setLatLng(latlng).setContent(content).openOn(map);
     }
 
     function fillSelects(ids, options) {
@@ -632,10 +679,52 @@
         document.getElementById('count-num-toggle').onchange = (e) => { config.useCountNum = e.target.checked; refreshVisuals(); };
         document.getElementById('count-den-toggle').onchange = (e) => { config.useCountDen = e.target.checked; refreshVisuals(); };
 
+        const slider = document.getElementById('max-limit-slider');
+        const manualToggle = document.getElementById('manual-max-toggle');
+        const sliderContainer = document.getElementById('slider-container');
+        document.getElementById('palette-select').onchange = (e) => { config.palette = e.target.value; refreshVisuals(); };
+        document.getElementById('legend-steps').onchange = (e) => { config.legendSteps = e.target.value; refreshVisuals(); };
+
+        manualToggle.onchange = (e) => {
+            const isManual = e.target.checked;
+            sliderContainer.style.pointerEvents = isManual ? 'auto' : 'none';
+            sliderContainer.style.opacity = isManual ? '1' : '0.4';
+            refreshVisuals();
+        };
+
+        slider.oninput = (e) => {
+            config.manualMax = parseFloat(e.target.value);
+            document.getElementById('max-limit-val').value = Math.ceil(config.manualMax);
+            refreshVisuals();
+        };
+
+        const maxInput = document.getElementById('max-limit-val');
+        maxInput.oninput = (e) => {
+            if (!manualToggle.checked) return;
+            const val = parseFloat(e.target.value) || 1;
+            config.manualMax = val;
+            slider.value = val;
+            refreshVisuals();
+        };
+
         const dZ = document.getElementById('drop-zone'), fI = document.getElementById('file-input');
         dZ.onclick = () => fI.click();
+        
+        dZ.ondragover = (e) => { e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--accent)"; };
+        dZ.ondragleave = (e) => { e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--border)"; };
+        dZ.ondrop = (e) => { 
+            e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--border)";
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        };
+        
         fI.onchange = (e) => handleFile(e.target.files[0]);
         document.getElementById('re-upload').onclick = () => document.getElementById('upload-overlay').classList.remove('hidden');
+
+        document.getElementById('mobile-toggle-menu')?.addEventListener('click', function() {
+            const content = document.querySelector('.sidebar-content');
+            content.classList.toggle('active');
+            this.textContent = content.classList.contains('active') ? '▲ Kapat' : '▼ Menü';
+        });
     }
 
     function showLoader(s) { document.getElementById('loader').style.display = s ? 'grid' : 'none'; }
