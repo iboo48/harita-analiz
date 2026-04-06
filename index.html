@@ -655,7 +655,7 @@
 
                 const fill = (sel) => {
                     if (!sel) return;
-                    sel.innerHTML = '';
+                    sel.innerHTML = '<option value="">-- Eşleşme Dosyası Seçilmedi (İsimle Eşleştir) --</option>';
                     if (data.status === 'success' && data.files.length > 0) {
                         data.files.forEach(f => {
                             const opt = document.createElement('option');
