@@ -94,7 +94,7 @@
         }
 
         .drop-zone {
-            width: 450px; padding: 60px 40px;
+            width: 90%; max-width: 450px; padding: 40px 20px; box-sizing: border-box;
             border: 2px dashed var(--border); border-radius: 20px;
             text-align: center; cursor: pointer; transition: all 0.3s;
             background: rgba(255,255,255,0.02);
@@ -325,8 +325,11 @@
         </div>
 
         <div id="legend">
-            <div id="legend-title" style="font-size: 0.75rem; font-weight: 800; margin-bottom: 12px; color: var(--accent); letter-spacing: 0.05em;">YOĞUNLUK SKALASI</div>
-            <div id="legend-body"></div>
+            <div id="legend-header" onclick="toggleLegend()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none;">
+                <div id="legend-title" style="font-size: 0.75rem; font-weight: 800; color: var(--accent); letter-spacing: 0.05em;">YOĞUNLUK SKALASI</div>
+                <span id="legend-toggle-btn" style="font-size:0.8rem; color:var(--accent); padding-left:8px;">▲</span>
+            </div>
+            <div id="legend-body" style="margin-top:12px;"></div>
         </div>
     </div>
 </div>
@@ -465,7 +468,7 @@
         excelData = json;
         const columns = Object.keys(json[0]);
         const numericCols = columns.filter(col => {
-            const key = col.toString().toUpperCase('tr-TR');
+            const key = col.toString().toLocaleUpperCase('tr-TR');
             const whiteList = ['BRUSELLOZ', 'ÇİÇEK', 'VEBA', 'SEPTİSEMİ', 'ŞAP', 'AŞI', 'HAYVAN', 'SAYI'];
             if (whiteList.some(w => key.includes(w))) return true;
             const forbiddenKeys = ['TC', 'KİMLİK', 'KIMLIK', 'VERGİ', 'VKN', 'IDENTIFIER', 'PASAPORT'];
@@ -488,8 +491,8 @@
         
         if (numericCols.length === 0) { alert("Sayısal veri bulunamadı!"); return; }
         fillSelects(['col-single', 'col-numerator', 'col-denominator'], numericCols);
-        const mCol = columns.find(c => { const k = c.toString().toUpperCase('tr-TR'); return k.includes('MAHALLE') || k === 'AD' || k.includes('KÖY'); });
-        const iCol = columns.find(c => { const k = c.toString().toUpperCase('tr-TR'); return k.includes('İLÇE') || k.includes('ILCE'); });
+        const mCol = columns.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('MAHALLE') || k === 'AD' || k.includes('KÖY'); });
+        const iCol = columns.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('İLÇE') || k.includes('ILCE'); });
 
         stats.mahalle = {}; stats.ilce = {}; stats.matchedCount = 0;
         json.forEach(row => {
@@ -500,32 +503,55 @@
             if (mName.endsWith(" MAHALLESİ")) mName = mName.replace(" MAHALLESİ", "");
 
             let match = null;
-            if (iName && mappingData.eslesmeler[`${iName}|${mName}`]) match = mappingData.eslesmeler[`${iName}|${mName}`];
-            else match = Object.values(mappingData.eslesmeler).find(e => e.sistemMahalle === mName);
+            if (iName && mappingData.eslesmeler[`${iName}|${mName}`]) {
+                // Tam anahtar eşleşmesi: İlçe|Mahalle
+                match = mappingData.eslesmeler[`${iName}|${mName}`];
+            } else if (iName) {
+                // Tam anahtar bulunamadı ama ilçe bilgisi var;
+                // sadece aynı ilçeye ait mahalleler arasında ara
+                match = Object.values(mappingData.eslesmeler).find(e =>
+                    e.sistemIlce === iName && e.sistemMahalle === mName
+                );
+            } else {
+                // İlçe bilgisi hiç yok; tüm mapping'de ara (yedek)
+                match = Object.values(mappingData.eslesmeler).find(e => e.sistemMahalle === mName);
+            }
             
             if (match) {
                 stats.matchedCount++; const ilceKey = match.sistemIlce;
                 if (!stats.ilce[ilceKey]) stats.ilce[ilceKey] = { total: 0, count: 0, mCount: 0, sums: {}, counts: {} };
                 stats.ilce[ilceKey].count++;
+
+                // 1. Adım: Excel satırındaki değerleri ONCE hesapla ve ilçeye ekle
+                const rowVals = {};
+                numericCols.forEach(col => {
+                    let currentVal = row[col];
+                    let val = 0;
+                    if (typeof currentVal === 'number') {
+                        val = currentVal;
+                    } else if (currentVal !== undefined && currentVal !== null && currentVal !== "") {
+                        let strVal = currentVal.toString().trim();
+                        if (strVal.includes(',')) val = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
+                        else val = parseFloat(strVal);
+                    }
+                    val = val || 0;
+                    rowVals[col] = val;
+                    // İlçe toplamına SADECE BIR KEZ ekle (mahalle döngüsünden bağımsız)
+                    stats.ilce[ilceKey].sums[col] = (stats.ilce[ilceKey].sums[col] || 0) + val;
+                    if (val !== 0) {
+                        stats.ilce[ilceKey].counts[col] = (stats.ilce[ilceKey].counts[col] || 0) + 1;
+                    }
+                });
+
+                // 2. Adım: Aynı değleri tüm eşleşen mahalle ID'lerine dağıt
                 match.eslesmeler.forEach(id => {
                     if (!stats.mahalle[id]) stats.mahalle[id] = { total: 0, count: 0, sums: {}, counts: {}, sistemMahalle: match.sistemMahalle };
                     const mObj = stats.mahalle[id];
                     numericCols.forEach(col => {
-                        let currentVal = row[col];
-                        let val = 0;
-                        if (typeof currentVal === 'number') {
-                            val = currentVal;
-                        } else if (currentVal !== undefined && currentVal !== null && currentVal !== "") {
-                            let strVal = currentVal.toString().trim();
-                            if (strVal.includes(',')) val = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
-                            else val = parseFloat(strVal);
-                        }
-                        val = val || 0;
+                        const val = rowVals[col];
                         mObj.sums[col] = (mObj.sums[col] || 0) + val;
-                        stats.ilce[ilceKey].sums[col] = (stats.ilce[ilceKey].sums[col] || 0) + val;
                         if (val !== 0) {
                             mObj.counts[col] = (mObj.counts[col] || 0) + 1;
-                            stats.ilce[ilceKey].counts[col] = (stats.ilce[ilceKey].counts[col] || 0) + 1;
                         }
                     });
                     mObj.count++;
@@ -577,13 +603,33 @@
         return den === 0 ? 0 : (num / den) * 100;
     }
 
+    // Mahalle istatistiklerini sistem mahallesi bazında tekilleştirir
+    // (aynı sistemMahalle'ye bağlı birden fazla GeoJSON ID'sini tek sayar)
+    function getUniqueMahalleItems(targetI) {
+        const seen = new Set();
+        const items = [];
+        Object.entries(stats.mahalle).forEach(([id, m]) => {
+            const ilce = getIlceById(id);
+            if (targetI !== 'all' && ilce !== targetI) return;
+            const key = `${ilce}|${m.sistemMahalle}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                items.push({ id, val: calculateValue(m), ilce });
+            }
+        });
+        return items;
+    }
+
     function refreshVisuals() {
         const view = config.view; const targetI = config.ilce; const steps = parseInt(config.legendSteps);
         let activeItems = [];
-        if (view === 'mahalle') activeItems = Object.entries(stats.mahalle).map(([id, m]) => ({ id, val: calculateValue(m), ilce: getIlceById(id) }));
-        else activeItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
-        
-        if (targetI !== 'all') activeItems = activeItems.filter(x => x.ilce === targetI);
+        if (view === 'mahalle') {
+            // Tekil sistem mahallelerini kullan (çok-ID eşleşmeleri tek sayılır)
+            activeItems = getUniqueMahalleItems(targetI);
+        } else {
+            activeItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
+            if (targetI !== 'all') activeItems = activeItems.filter(x => x.ilce === targetI);
+        }
         
         const vals = activeItems.map(x => x.val).filter(v => v > 0);
         const min = vals.length ? Math.min(...vals) : 0, maxOrig = vals.length ? Math.max(...vals) : 0;
@@ -633,12 +679,25 @@
 
     function updateSummaryCard() {
         if (!excelData) return;
-        let activeItems = (config.view === 'mahalle') ? Object.entries(stats.mahalle).map(([id, m]) => ({ id, val: calculateValue(m), ilce: getIlceById(id) })) : Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
-        if (config.ilce !== 'all') activeItems = activeItems.filter(x => x.ilce === config.ilce);
-        const vals = activeItems.map(x => x.val);
-        const total = vals.reduce((a, b) => a + b, 0);
+
+        // TOPLAM: Her zaman ilce stats'indan hesapla (GeoJSON'da karsiliksiz mahalleler de dahil olur)
+        // Bu sayede Mahalle/Ilce gorunum degisince toplam degismez
+        let ilceItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
+        if (config.ilce !== 'all') ilceItems = ilceItems.filter(x => x.ilce === config.ilce);
+        const totalVals = ilceItems.map(x => x.val);
+        const total = totalVals.reduce((a, b) => a + b, 0);
+
+        // ORTALAMA: Gorunume gore farkli bolucuyle hesapla
+        let avgDivisor = 1;
+        if (config.view === 'mahalle') {
+            // Benzersiz sistem mahallesi sayisi
+            avgDivisor = getUniqueMahalleItems(config.ilce).length || 1;
+        } else {
+            avgDivisor = ilceItems.length || 1;
+        }
+
         document.getElementById('stat-total').innerHTML = `Toplam: <b style="color:#fff">${total.toLocaleString('tr', {maximumFractionDigits: 2})}${config.mode==='percent'?'%':''}</b>`;
-        document.getElementById('stat-avg').innerHTML = `Ortalama: <b style="color:#fff">${(total / (vals.length || 1)).toLocaleString('tr', {maximumFractionDigits: 2})}${config.mode==='percent'?'%':''}</b>`;
+        document.getElementById('stat-avg').innerHTML = `Ortalama: <b style="color:#fff">${(total / avgDivisor).toLocaleString('tr', {maximumFractionDigits: 2})}${config.mode==='percent'?'%':''}</b>`;
         document.getElementById('stat-match').innerHTML = `Eşleşme: <b style="color:#fff">%${((stats.matchedCount / excelData.length) * 100).toFixed(1)}</b>`;
     }
 
@@ -819,6 +878,27 @@
     function updateEditLink() {
         const link = document.getElementById('edit-mappings-link');
         if (link && config.city) link.href = `index_eslesme.html?city=${encodeURIComponent(config.city)}`;
+    }
+
+    // Lejant paneli aç/kapat
+    let legendOpen = true;
+    function toggleLegend() {
+        legendOpen = !legendOpen;
+        const body = document.getElementById('legend-body');
+        const btn  = document.getElementById('legend-toggle-btn');
+        body.style.display = legendOpen ? 'block' : 'none';
+        btn.textContent = legendOpen ? '▲' : '▼';
+        // Lejant başlığı padding'ini ayarla
+        document.getElementById('legend-header').style.paddingBottom = legendOpen ? '0' : '0';
+    }
+
+    // Mobilde lejant kapalı başlasın
+    if (window.innerWidth <= 768) {
+        window.addEventListener('DOMContentLoaded', () => {
+            const body = document.getElementById('legend-body');
+            const btn  = document.getElementById('legend-toggle-btn');
+            if (body && btn) { body.style.display = 'none'; btn.textContent = '▼'; legendOpen = false; }
+        });
     }
 
     init();

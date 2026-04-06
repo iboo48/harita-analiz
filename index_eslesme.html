@@ -62,6 +62,27 @@
     .filter-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 99px; color: var(--text-secondary); padding: 5px 12px; font-size: 12px; cursor: pointer; }
     .filter-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
 
+    .srow-header { display: flex; justify-content: space-between; align-items: center; }
+    .srow-header .sistem-adi { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .srow-header .sistem-ilce { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; }
+    .row-actions { display: flex; gap: 6px; margin-top: 4px; }
+    .row-actions button { flex: 1; padding: 5px; font-size: 11px; }
+
+    /* Mobil Uyumlu Akordiyon Menü İçin */
+    .mobile-toggle-btn {
+        display: none; background: rgba(59,130,246,0.2); border: 1px solid var(--accent); color: white;
+        padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700;
+    }
+    @media (max-width: 768px) {
+        body { flex-direction: column; }
+        #left-panel { border-right: none; border-bottom: 2px solid var(--accent); z-index: 2002; display: flex; flex-direction: column; flex: none; width: 100% !important; min-width: auto; max-width: none; max-height: 60vh;}
+        .scrollable { display: none; }
+        .scrollable.active { display: block; }
+        .mobile-toggle-btn { display: block; }
+        #right-panel { flex: 1; min-height: 40vh; }
+        .map-overlay-top { left: 10px; top: 10px; }
+    }
+
     .loader { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid var(--accent); border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
@@ -70,7 +91,10 @@
 
   <div id="left-panel">
     <div class="panel-header">
-      <h1 style="display:flex; align-items:center; gap:8px;">🗂️ Eşleştirme <span style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px;">STATIC</span></h1>
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom: 10px;">
+        <h1 style="display:flex; align-items:center; gap:8px;">🗂️ Eşleştirme <span style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px;">STATIC</span></h1>
+        <button class="mobile-toggle-btn" id="mobile-toggle-menu">▼ Menü</button>
+      </div>
       <div style="display: flex; gap: 6px; flex-wrap: wrap;">
         <button class="btn" onclick="document.getElementById('file-upload-input').click()">📥 Excel</button>
         <button class="btn" onclick="loadServerJSON()">📂 Liste</button>
@@ -131,6 +155,12 @@ const COLORS = { matched: '#22c55e', unmatched: '#ef4444' };
 document.addEventListener("DOMContentLoaded", () => {
     initMap();
     fetchMapSources();
+    
+    document.getElementById('mobile-toggle-menu')?.addEventListener('click', function() {
+        const content = document.querySelector('.scrollable');
+        content.classList.toggle('active');
+        this.textContent = content.classList.contains('active') ? '▲ Kapat' : '▼ Menü';
+    });
 });
 
 function initMap() {
@@ -163,7 +193,9 @@ async function loadSelectedMap() {
         geoIndex = {};
         geoData.features.forEach(f => {
             const p = f.properties;
-            const ad = p.AD || p.name || "Bilinmiyor", ilce = p.ILCEAD || p.ilce || "Bilinmiyor", kno = p.KIMLIKNO || p.id || Math.random();
+            const ad = p.AD || p.name || p.MAHALLE || "Bilinmiyor";
+            const ilce = p.ILCEAD || p.ilce || p.DISTRICT || "Bilinmiyor";
+            const kno = p.KIMLIKNO || p.id || p.ID || Math.floor(Math.random()*100000);
             f.properties.STD_AD = ad; f.properties.STD_ILCE = ilce; f.properties.STD_KNO = kno;
             geoIndex[kno] = { ad, ilce, kno };
         });
@@ -186,16 +218,34 @@ function renderMap() {
 
 function handleMapClick(f, e) {
     const kno = String(f.properties.STD_KNO);
-    const match = Object.values(eslesmeData.eslesmeler).find(v => v.eslesmeler?.includes(kno));
-    let html = `<b>${f.properties.STD_AD}</b><br>${f.properties.STD_ILCE}<br>`;
-    if (activeRowKey && !match) html += `<button onclick="commitAdd('${kno}')" style="margin-top:10px; width:100%; cursor:pointer;">Ekle</button>`;
-    else if (match) html += `<i>${match.sistemMahalle} ile eşli</i>`;
-    L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+    const matchEntry = Object.entries(eslesmeData.eslesmeler).find(([k, v]) => v.eslesmeler?.includes(kno));
+    
+    let html = `<div style="padding:5px; min-width:180px;">`;
+    html += `<b>${f.properties.STD_AD}</b><br><span style="font-size:11px">${f.properties.STD_ILCE}</span><br>`;
+    
+    if (matchEntry) {
+        html += `<div style="margin-top:5px; color:#16a34a; font-size:11px;">Eşli: <b>${matchEntry[1].sistemMahalle} (${matchEntry[1].sistemIlce})</b></div>`;
+    } else {
+        html += `<div style="margin-top:5px; color:#dc2626; font-size:11px;">⚠️ ATANMAMIŞ</div>`;
+    }
+
+    if (activeRowKey) {
+        const eData = eslesmeData.eslesmeler[activeRowKey];
+        if (!eData.eslesmeler.some(id => String(id) === kno)) {
+            html += `<hr style="border:0; border-top:1px solid #ccc;"><button onclick="commitAdd('${activeRowKey.replace(/'/g, "\\'")}', '${kno}')" style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; width:100%; font-size:12px;">Aktif Satıra Ekle</button>`;
+        }
+    }
+    html += `</div>`;
+    L.popup({ autoPan:false }).setLatLng(e.latlng).setContent(html).openOn(map);
 }
 
-window.commitAdd = (kno) => {
-    eslesmeData.eslesmeler[activeRowKey].eslesmeler.push(kno);
-    renderMap(); renderList(); updateStats(); map.closePopup();
+window.commitAdd = (key, kno) => {
+    const eData = eslesmeData.eslesmeler[key];
+    if (eData && !eData.eslesmeler.some(id => String(id) === kno)) {
+        eData.eslesmeler.push(kno);
+        eData.eslesmeTuru = 'manuel';
+        updateStats(); renderList(); renderMap(); map.closePopup();
+    }
 };
 
 async function loadServerJSON() {
@@ -206,57 +256,169 @@ async function loadServerJSON() {
     if (idx && data.files[idx-1]) {
         const fres = await fetch(data.files[idx-1].path);
         eslesmeData = await fres.json();
-        renderMap(); renderList(); updateStats();
+        postDataLoad();
     }
 }
 
 function handleExcelUpload(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    document.getElementById('dl-filename').value = file.name.split('.')[0] + "_eslesme";
     const reader = new FileReader();
     reader.onload = (ev) => {
         const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
         processExcel(json);
     };
-    reader.readAsArrayBuffer(e.target.files[0]);
+    reader.readAsArrayBuffer(file);
 }
 
 function processExcel(json) {
     const cols = Object.keys(json[0]);
-    const mCol = cols.find(c => c.toUpperCase().includes('MAHALLE'));
+    const mCol = cols.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('MAHALLE') || k === 'AD' || k.includes('KÖY'); });
+    const iCol = cols.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('İLÇE') || k.includes('ILCE'); });
+
+    if (!mCol) { alert("Excelde Mahalle sütunu bulunamadı!"); return; }
+
+    const newMappings = {};
+    const haritaMahalleleri = Object.values(geoIndex);
+
     json.forEach(row => {
-        const name = row[mCol]?.toString().toUpperCase('tr-TR');
-        if (name) eslesmeData.eslesmeler[name] = { sistemMahalle: name, sistemIlce: "Excel", eslesmeler: [], manuelOnaylandi: false };
+        const mNameRaw = row[mCol]?.toString() || "";
+        const iNameRaw = iCol ? (row[iCol]?.toString() || "") : "";
+        let mName = mNameRaw.toLocaleUpperCase('tr-TR');
+        let iName = iNameRaw.toLocaleUpperCase('tr-TR').trim();
+        
+        mName = mName.replace(/\s+(MAHALLESİ|MAHALLE|KÖYÜ|KÖY)\b/g, '').replace(/\s+MAH\./g, '').trim();
+        if (mName.endsWith(" MAHALLESİ")) mName = mName.replace(" MAHALLESİ", "");
+
+        if (!mName) return;
+        const key = `${iName}|${mName}`;
+        if (eslesmeData.eslesmeler[key]) { newMappings[key] = eslesmeData.eslesmeler[key]; return; }
+
+        let matchedIds = []; let eslesmeTuru = 'eslesmedi';
+        const exact = haritaMahalleleri.filter(g => g.ad.toLocaleUpperCase('tr-TR') === mName && (iName === "" || g.ilce.toLocaleUpperCase('tr-TR') === iName));
+        if (exact.length > 0) { matchedIds = exact.map(x => x.kno); eslesmeTuru = 'birebir'; }
+        else {
+            const fuzzy = haritaMahalleleri.filter(g => (iName === "" || g.ilce.toLocaleUpperCase('tr-TR') === iName) && (g.ad.toLocaleUpperCase('tr-TR').includes(mName) || mName.includes(g.ad.toLocaleUpperCase('tr-TR'))));
+            if (fuzzy.length > 0) { matchedIds = fuzzy.map(x => x.kno); eslesmeTuru = 'otomatik'; }
+        }
+        newMappings[key] = { sistemIlce: iName || "BİLİNMİYOR", sistemMahalle: mName, eslesmeler: matchedIds, eslesmeTuru: eslesmeTuru, manuelOnaylandi: eslesmeTuru === 'birebir' };
     });
-    renderList(); updateStats();
+    eslesmeData.eslesmeler = newMappings;
+    activeRowKey = null; postDataLoad();
 }
 
 function handleLocalJSON(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    document.getElementById('dl-filename').value = file.name.replace('.json', '');
     const reader = new FileReader();
-    reader.onload = (ev) => { eslesmeData = JSON.parse(ev.target.result); renderMap(); renderList(); updateStats(); };
-    reader.readAsText(e.target.files[0]);
+    reader.onload = (ev) => { eslesmeData = JSON.parse(ev.target.result); postDataLoad(); };
+    reader.readAsText(file);
+}
+
+function postDataLoad() {
+    buildIlceFilter(); updateStats(); renderList(); renderMap();
+}
+
+function buildIlceFilter() {
+    const ilceler = new Set();
+    Object.values(eslesmeData.eslesmeler).forEach(e => { if(e.sistemIlce) ilceler.add(e.sistemIlce); });
+    const sel = document.getElementById('ilce-filter');
+    sel.innerHTML = '<option value="">Tüm İlçeler</option>';
+    [...ilceler].sort((a,b) => a.localeCompare(b, 'tr')).forEach(il => { sel.add(new Option(il, il)); });
+}
+
+function getRowClass(e) {
+    if (!e.eslesmeler || e.eslesmeler.length === 0) return 'eslesmedi';
+    if (!e.manuelOnaylandi) return 'bekliyor';
+    return 'onaylandi';
 }
 
 function renderList() {
     const cont = document.getElementById('match-list');
-    cont.innerHTML = Object.entries(eslesmeData.eslesmeler).map(([k, v]) => `
-      <div class="match-row ${activeRowKey===k?'active':''}" onclick="activeRowKey='${k}'; renderList();">
-        <b>${v.sistemMahalle}</b>
-        <div class="kno-tags">${(v.eslesmeler||[]).map(id => `<span class="kno-tag">${id}</span>`).join('')}</div>
-      </div>
-    `).join('');
+    const q = document.getElementById('search-input').value.toLocaleUpperCase('tr-TR');
+    const ilceSel = document.getElementById('ilce-filter').value;
+    
+    if (Object.keys(eslesmeData.eslesmeler).length === 0) {
+        cont.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">Kayıt bulunamadı.</div>';
+        return;
+    }
+    
+    const filtered = Object.entries(eslesmeData.eslesmeler).filter(([key, e]) => {
+        if (ilceSel && e.sistemIlce !== ilceSel) return false;
+        if (q && !e.sistemMahalle.toLocaleUpperCase('tr-TR').includes(q) && !(e.sistemIlce || '').toLocaleUpperCase('tr-TR').includes(q)) return false;
+        const cls = getRowClass(e);
+        if (currentFilter === 'onayli' && cls !== 'onaylandi') return false;
+        if (currentFilter === 'bekleyen' && cls !== 'bekliyor') return false;
+        if (currentFilter === 'eslesmeyen' && cls !== 'eslesmedi') return false;
+        return true;
+    });
+
+    let html = '';
+    filtered.forEach(([key, e]) => {
+        const cls = getRowClass(e);
+        const isActive = activeRowKey === key ? 'active' : '';
+        const tags = (e.eslesmeler || []).map(id => {
+            const g = geoIndex[id]; const name = g ? g.ad : (`ID:`+id);
+            return `<div class="kno-tag">${name} <span class="remove" onclick="event.stopPropagation(); removeGeo('${key}','${id}')">×</span></div>`;
+        }).join('');
+        
+        html += `<div class="match-row ${cls} ${isActive}" onclick="setActiveRow('${key}')">
+            <div class="srow-header">
+                <span class="sistem-adi">${e.sistemMahalle}</span>
+                <span class="sistem-ilce">${e.sistemIlce || 'Bilinmiyor'}</span>
+            </div>
+            <div class="kno-tags">${tags.length > 0 ? tags : '<span style="font-size:11px; color:#ef4444; font-style:italic;">Haritadan tıklatarak eşleştirin...</span>'}</div>
+            <div class="row-actions">
+                ${!e.manuelOnaylandi && (e.eslesmeler && e.eslesmeler.length > 0) ? `<button class="btn btn-primary" onclick="event.stopPropagation(); setOnay('${key}', true)">✓ Onayla</button>` : ``}
+                ${e.manuelOnaylandi ? `<button class="btn" style="color:var(--text-secondary)" onclick="event.stopPropagation(); setOnay('${key}', false)">↩ Geri Al</button>` : ``}
+                <button class="btn" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.3)" onclick="event.stopPropagation(); clearRow('${key}')">✕ Sıfırla</button>
+            </div>
+        </div>`;
+    });
+    cont.innerHTML = html;
 }
+
+window.setActiveRow = function(key) { activeRowKey = activeRowKey === key ? null : key; renderList(); };
+window.setOnay = function(key, val) { eslesmeData.eslesmeler[key].manuelOnaylandi = val; updateStats(); renderList(); };
+window.removeGeo = function(key, id) {
+    const e = eslesmeData.eslesmeler[key];
+    e.eslesmeler = e.eslesmeler.filter(x => String(x) !== String(id));
+    if(e.eslesmeler.length === 0) e.manuelOnaylandi = false;
+    updateStats(); renderList(); renderMap();
+};
+window.clearRow = function(key) { eslesmeData.eslesmeler[key].eslesmeler = []; eslesmeData.eslesmeler[key].eslesmeTuru = 'eslesmedi'; eslesmeData.eslesmeler[key].manuelOnaylandi = false; updateStats(); renderList(); renderMap(); };
 
 function updateStats() {
     const vals = Object.values(eslesmeData.eslesmeler);
-    document.getElementById('stats').innerHTML = `<div class="stat-card"><div class="val">${vals.length}</div><div class="lbl">TOPLAM</div></div>`;
+    const total = vals.length;
+    if(total===0) return;
+    let onay = 0, bekle = 0, esle = 0;
+    vals.forEach(e => { const c = getRowClass(e); if (c==='onaylandi') onay++; else if(c==='bekliyor') bekle++; else esle++; });
+    
+    document.getElementById('stats').innerHTML = `
+      <div class="stat-card ok"><div class="val">${onay}</div><div class="lbl">ONAYLI</div></div>
+      <div class="stat-card warn"><div class="val">${bekle}</div><div class="lbl">BEKLEYÊN</div></div>
+      <div class="stat-card err"><div class="val">${esle}</div><div class="lbl">EŞLEŞMEDİ</div></div>
+      <div class="stat-card"><div class="val">${total}</div><div class="lbl">TOPLAM</div></div>
+    `;
 }
 
 function downloadJSON() {
+    if(Object.keys(eslesmeData.eslesmeler).length === 0) { alert("İndirilecek veri yok."); return; }
+    const fname = document.getElementById('dl-filename').value || 'eslesme';
     const blob = new Blob([JSON.stringify(eslesmeData, null, 2)], {type:'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'eslesme.json'; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname + '.json'; a.click();
 }
 
-function setFilter(f, btn) { currentFilter = f; renderList(); }
+function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderList();
+}
 </script>
 </body>
 </html>
