@@ -156,10 +156,13 @@ document.addEventListener("DOMContentLoaded", () => {
     initMap();
     fetchMapSources();
     
-    document.getElementById('mobile-toggle-menu')?.addEventListener('click', function() {
+    document.getElementById('mobile-toggle-menu')?.addEventListener('click', function () {
         const content = document.querySelector('.scrollable');
         content.classList.toggle('active');
         this.textContent = content.classList.contains('active') ? '▲ Kapat' : '▼ Menü';
+        
+        // Mobilde menü kapandığında haritayı yenile (boyut değişikliği için)
+        if (map) setTimeout(() => map.invalidateSize(), 300);
     });
 });
 
@@ -365,12 +368,12 @@ function renderList() {
             return `<div class="kno-tag">${name} <span class="remove" onclick="event.stopPropagation(); removeGeo('${key}','${id}')">×</span></div>`;
         }).join('');
         
-        html += `<div class="match-row ${cls} ${isActive}" onclick="setActiveRow('${key}')">
+        html += `<div class="match-row ${cls} ${isActive}" onclick="setActiveRow('${key.replace(/'/g, "\\'")}')">
             <div class="srow-header">
                 <span class="sistem-adi">${e.sistemMahalle}</span>
-                <span class="sistem-ilce">${e.sistemIlce || 'Bilinmiyor'}</span>
+                <span class="sistem-ilce" style="background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-weight:700; color:var(--accent); font-size:10px;">${e.sistemIlce || 'BİLİNMİYOR'}</span>
             </div>
-            <div class="kno-tags">${tags.length > 0 ? tags : '<span style="font-size:11px; color:#ef4444; font-style:italic;">Haritadan tıklatarak eşleştirin...</span>'}</div>
+            <div class="kno-tags">${tags.length > 0 ? tags : '<span style="font-size:11px; color:#ef4444; font-style:italic;">Haritadan mahalle seçin...</span>'}</div>
             <div class="row-actions">
                 ${!e.manuelOnaylandi && (e.eslesmeler && e.eslesmeler.length > 0) ? `<button class="btn btn-primary" onclick="event.stopPropagation(); setOnay('${key}', true)">✓ Onayla</button>` : ``}
                 ${e.manuelOnaylandi ? `<button class="btn" style="color:var(--text-secondary)" onclick="event.stopPropagation(); setOnay('${key}', false)">↩ Geri Al</button>` : ``}
@@ -389,7 +392,13 @@ window.removeGeo = function(key, id) {
     if(e.eslesmeler.length === 0) e.manuelOnaylandi = false;
     updateStats(); renderList(); renderMap();
 };
-window.clearRow = function(key) { eslesmeData.eslesmeler[key].eslesmeler = []; eslesmeData.eslesmeler[key].eslesmeTuru = 'eslesmedi'; eslesmeData.eslesmeler[key].manuelOnaylandi = false; updateStats(); renderList(); renderMap(); };
+window.clearRow = function(key) { 
+    if(!confirm('Bu satırdaki tüm eşleşmeleri silmek istediğinize emin misiniz?')) return;
+    eslesmeData.eslesmeler[key].eslesmeler = []; 
+    eslesmeData.eslesmeler[key].eslesmeTuru = 'eslesmedi'; 
+    eslesmeData.eslesmeler[key].manuelOnaylandi = false; 
+    updateStats(); renderList(); renderMap(); 
+};
 
 function updateStats() {
     const vals = Object.values(eslesmeData.eslesmeler);

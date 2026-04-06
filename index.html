@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gelişmiş Mahalle Veri Analiz Haritası (GitHub Edition)</title>
-    
+
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3b82f6">
     <link rel="apple-touch-icon" href="icons/icon-192x192.png">
-    
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -24,884 +25,1150 @@
             --radius: 12px;
         }
 
-        body, html {
-            margin: 0; padding: 0; height: 100%;
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
             font-family: 'Inter', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             overflow: hidden;
         }
 
-        #app { display: flex; height: 100vh; width: 100vw; }
+        #app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
 
         #sidebar {
             width: 400px;
             background: var(--glass);
             backdrop-filter: blur(20px);
             border-right: 1px solid var(--border);
-            display: flex; flex-direction: column;
-            z-index: 1001; box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            z-index: 1001;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
         }
 
         .sidebar-header {
-            padding: 24px; border-bottom: 1px solid var(--border);
-            background: rgba(0,0,0,0.2); text-align: center;
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.2);
+            text-align: center;
         }
 
-        .sidebar-header h1 { font-size: 1.1rem; margin: 0; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+        .sidebar-header h1 {
+            font-size: 1.1rem;
+            margin: 0;
+            font-weight: 700;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
 
-        .sidebar-content { padding: 20px; flex: 1; overflow-y: auto; }
+        .sidebar-content {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
 
         .section-title {
-            font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em;
-            color: var(--accent); margin-bottom: 12px; margin-top: 24px; font-weight: 700;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--accent);
+            margin-bottom: 12px;
+            margin-top: 24px;
+            font-weight: 700;
         }
 
         .control-group {
             background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 16px; margin-bottom: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
         }
 
-        label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px; }
+        label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
 
         select {
-            width: 100%; padding: 10px; background: #1e293b;
-            border: 1px solid var(--border); border-radius: 6px;
-            color: white; font-family: inherit; outline: none; cursor: pointer; font-size: 0.85rem;
+            width: 100%;
+            padding: 10px;
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: white;
+            font-family: inherit;
+            outline: none;
+            cursor: pointer;
+            font-size: 0.85rem;
         }
 
         .btn-toggle-group {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
-            background: rgba(0,0,0,0.2); padding: 4px; border-radius: 8px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px;
+            border-radius: 8px;
         }
 
         .btn-toggle-group button {
-            padding: 8px; background: transparent; border: none; border-radius: 6px;
-            color: var(--text-secondary); cursor: pointer; font-size: 0.75rem;
-            transition: all 0.2s; font-weight: 500;
+            padding: 8px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+            font-weight: 500;
         }
 
-        .btn-toggle-group button.active { background: var(--accent); color: white; font-weight: 600; }
+        .btn-toggle-group button.active {
+            background: var(--accent);
+            color: white;
+            font-weight: 600;
+        }
 
-        #map-container { flex: 1; position: relative; }
-        #map { width: 100%; height: 100%; background: #0b0f1a; }
+        #map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #0b0f1a;
+        }
 
         #upload-overlay {
-            position: absolute; inset: 0;
-            background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(20px);
-            z-index: 2000; display: flex; align-items: center; justify-content: center;
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.98);
+            backdrop-filter: blur(20px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .drop-zone {
-            width: 90%; max-width: 450px; padding: 40px 20px; box-sizing: border-box;
-            border: 2px dashed var(--border); border-radius: 20px;
-            text-align: center; cursor: pointer; transition: all 0.3s;
-            background: rgba(255,255,255,0.02);
+            width: 100%;
+            padding: 40px 20px;
+            box-sizing: border-box;
+            border: 2px dashed var(--border);
+            border-radius: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255, 255, 255, 0.02);
         }
 
-        .drop-zone:hover { border-color: var(--accent); background: rgba(59, 130, 246, 0.05); }
+        .drop-zone:hover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.05);
+        }
 
         #legend {
-            position: absolute; bottom: 30px; right: 30px;
-            background: var(--glass); backdrop-filter: blur(15px);
-            border: 1px solid var(--border); border-radius: 12px;
-            padding: 16px; min-width: 220px; z-index: 1000; box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 220px;
+            z-index: 1000;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
         }
 
-        .legend-item { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 0.75rem; }
-        .color-box { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            font-size: 0.75rem;
+        }
+
+        .color-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
 
         .custom-popup .leaflet-popup-content-wrapper {
-            background: #1e293b; color: white; border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); padding: 5px;
+            background: #1e293b;
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            padding: 5px;
         }
 
-        .popup-table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
-        .popup-table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        .popup-table tr.highlight { background: rgba(59,130,246,0.15); color: #60a5fa; font-weight: 700; }
+        .popup-table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.85rem;
+        }
+
+        .popup-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .popup-table tr.highlight {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            font-weight: 700;
+        }
 
         #loader {
-            display: none; position: fixed; inset: 0;
-            background: rgba(0,0,0,0.8); place-items: center; z-index: 9999;
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            place-items: center;
+            z-index: 9999;
         }
+
         .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent);
-            border-radius: 50%; animation: spin 1s linear infinite;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .hidden { display: none !important; }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
 
         /* Mobil Uyumlu Akordiyon Menü İçin */
         .mobile-toggle-btn {
-            display: none; background: rgba(59,130,246,0.2); border: 1px solid var(--accent); color: white;
-            padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700;
+            display: none;
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid var(--accent);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 700;
         }
+
         @media (max-width: 768px) {
-            #app { flex-direction: column; }
-            #sidebar { width: 100%; height: auto; max-height: 60vh; border-right: none; border-bottom: 2px solid var(--accent); z-index: 2002; display: flex; flex-direction: column; }
-            .sidebar-content { display: none; }
-            .sidebar-content.active { display: block; }
-            .mobile-toggle-btn { display: block; }
-            #map-container { flex: 1; min-height: 40vh; }
+            #app {
+                flex-direction: column;
+            }
+
+            #sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 60vh;
+                border-right: none;
+                border-bottom: 2px solid var(--accent);
+                z-index: 2002;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .sidebar-content {
+                display: none;
+            }
+
+            .sidebar-content.active {
+                display: block;
+            }
+
+            .mobile-toggle-btn {
+                display: block;
+            }
+
+            #map-container {
+                flex: 1;
+                min-height: 40vh;
+            }
         }
     </style>
 </head>
+
 <body>
 
-<div id="loader"><div class="spinner"></div></div>
+    <div id="loader">
+        <div class="spinner"></div>
+    </div>
 
-<div id="app">
-    <div id="sidebar">
-        <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;">
-            <h1 style="font-size: 1rem;">🗺️ Harita Analizi</h1>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <span style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px; font-weight:700;">STATIC</span>
-                <button class="mobile-toggle-btn" id="mobile-toggle-menu">▼ Menü</button>
+    <div id="app">
+        <div id="sidebar">
+            <div class="sidebar-header"
+                style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;">
+                <h1 style="font-size: 1rem;">🗺️ Harita Analizi</h1>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span
+                        style="font-size:0.6rem; background:rgba(59,130,246,0.2); color:var(--accent); padding:2px 6px; border-radius:4px; font-weight:700;">STATIC</span>
+                    <button class="mobile-toggle-btn" id="mobile-toggle-menu">▼ Menü</button>
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+                <div id="data-controls" class="hidden">
+                    <div class="section-title">Analiz Modu</div>
+                    <div class="control-group">
+                        <div class="btn-toggle-group" id="mode-toggle">
+                            <button data-mode="single" class="active">Miktar (SUM)</button>
+                            <button data-mode="percent">Oran (%)</button>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Sütun Seçimi</div>
+                    <div class="control-group">
+                        <div id="single-col-group">
+                            <label>Veri Sütunu</label>
+                            <select id="col-single"></select>
+                            <label class="switch"
+                                style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="count-single-toggle" style="width:auto; cursor:pointer;">
+                                <span style="font-size:0.7rem; color:var(--text-secondary);">Değer yerine adeti (veri
+                                    sayısını) kullan</span>
+                            </label>
+                        </div>
+
+                        <div id="percent-col-group" class="hidden">
+                            <div style="margin-bottom: 12px;">
+                                <label>Pay (Üst Değer)</label>
+                                <select id="col-numerator"></select>
+                                <label class="switch"
+                                    style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="count-num-toggle" style="width:auto; cursor:pointer;">
+                                    <span style="font-size:0.7rem; color:var(--text-secondary);">Pay için adeti
+                                        kullan</span>
+                                </label>
+                            </div>
+                            <div>
+                                <label>Payda (Alt Değer)</label>
+                                <select id="col-denominator"></select>
+                                <label class="switch"
+                                    style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="count-den-toggle" style="width:auto; cursor:pointer;">
+                                    <span style="font-size:0.7rem; color:var(--text-secondary);">Payda için adeti
+                                        kullan</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Harita Ayarları</div>
+                    <div class="control-group">
+                        <label>Lejant Hassasiyeti (Basamak)</label>
+                        <select id="legend-steps">
+                            <option value="3">3 Basamak (Basit)</option>
+                            <option value="5" selected>5 Basamak (Standart)</option>
+                            <option value="8">8 Basamak (Detaylı)</option>
+                            <option value="10">10 Basamak (Hassas)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <label style="margin-bottom:0">Yoğunluk Skalası (Üst Limit)</label>
+                            <label class="switch"
+                                style="margin-bottom:0; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                                <input type="checkbox" id="manual-max-toggle" style="width:auto; cursor:pointer;">
+                                <span style="font-size:0.65rem; color:var(--text-secondary);">Manuel</span>
+                            </label>
+                        </div>
+                        <div id="slider-container"
+                            style="display: flex; align-items: center; gap: 10px; opacity: 0.4; pointer-events: none;">
+                            <input type="range" id="max-limit-slider" min="1" max="10000" value="1000"
+                                style="flex: 1; accent-color: var(--accent);">
+                            <input type="number" id="max-limit-val"
+                                style="font-size: 0.8rem; width: 65px; text-align: right; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: white; padding: 4px;"
+                                value="0">
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Renk Teması</label>
+                        <select id="palette-select">
+                            <option value="GYR">Performans (Yeşil -> Kırmızı)</option>
+                            <option value="RYG">Risk (Kırmızı -> Yeşil)</option>
+                            <option value="OCEAN">Okyanus (Mavi Tonları)</option>
+                            <option value="PURPLE">Kıvılcım (Mor -> Turuncu)</option>
+                            <option value="TRAFFIC">Trafik (G-S-K)</option>
+                        </select>
+                    </div>
+
+                    <div class="section-title">Görünüm ve Filtre</div>
+                    <div class="control-group">
+                        <label>Çalışma Haritası (İl/Bölge)</label>
+                        <select id="city-select">
+                            <option value="">Yükleniyor...</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Harita Düzeyi</label>
+                        <div class="btn-toggle-group" id="view-toggle" style="margin-bottom: 12px;">
+                            <button data-view="mahalle" class="active">Mahalle</button>
+                            <button data-view="ilce">İlçe</button>
+                        </div>
+                        <label>İlçe Filtresi</label>
+                        <select id="ilce-filter">
+                            <option value="all">Tüm Liste</option>
+                        </select>
+                    </div>
+
+                    <div id="summary-card" class="control-group" style="font-size: 0.85rem; line-height: 1.8;">
+                        <div
+                            style="font-weight: 700; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                            📊 ANALİTİK ÖZET</div>
+                        <div id="stat-total">Toplam: -</div>
+                        <div id="stat-avg">Ortalama: -</div>
+                        <div id="stat-match">Eşleşme: %-</div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Eşleşme Dosyası (.json)</label>
+                        <select id="overlay-mapping-select-static"></select>
+                        <div id="selected-mapping-info"
+                            style="font-size:0.65rem; color:var(--success); margin-top:4px; display:none;"></div>
+                    </div>
+
+                    <button id="re-upload"
+                        style="width: 100%; padding: 12px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 8px; color: var(--text-secondary); cursor: pointer; margin-top: 10px;">Yeni
+                        Excel Yükle</button>
+                </div>
+
+                <div id="welcome-msg" style="margin-top: 50px; text-align: center; color: var(--text-secondary);">
+                    <div style="font-size: 4rem; opacity: 0.1; margin-bottom: 20px;">🛡️</div>
+                    <p>Verileri haritaya yansıtmak ve analiz yapmak için bir Excel dosyası yükleyin.</p>
+                    <button id="pwa-install-btn"
+                        style="display:none; margin: 20px auto; padding: 12px 25px; background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent); color: var(--accent); border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);">
+                        📥 Uygulama Olarak Yükle
+                    </button>
+                </div>
             </div>
         </div>
-        
-        <div class="sidebar-content">
-            <div id="data-controls" class="hidden">
-                <div class="section-title">Analiz Modu</div>
-                <div class="control-group">
-                    <div class="btn-toggle-group" id="mode-toggle">
-                        <button data-mode="single" class="active">Miktar (SUM)</button>
-                        <button data-mode="percent">Oran (%)</button>
-                    </div>
-                </div>
 
-                <div class="section-title">Sütun Seçimi</div>
-                <div class="control-group">
-                    <div id="single-col-group">
-                        <label>Veri Sütunu</label>
-                        <select id="col-single"></select>
-                        <label class="switch" style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
-                            <input type="checkbox" id="count-single-toggle" style="width:auto; cursor:pointer;">
-                            <span style="font-size:0.7rem; color:var(--text-secondary);">Değer yerine adeti (veri sayısını) kullan</span>
-                        </label>
-                    </div>
-                    
-                    <div id="percent-col-group" class="hidden">
-                        <div style="margin-bottom: 12px;">
-                            <label>Pay (Üst Değer)</label>
-                            <select id="col-numerator"></select>
-                            <label class="switch" style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                <input type="checkbox" id="count-num-toggle" style="width:auto; cursor:pointer;">
-                                <span style="font-size:0.7rem; color:var(--text-secondary);">Pay için adeti kullan</span>
-                            </label>
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="upload-overlay">
+                <div
+                    style="display: flex; flex-direction: column; gap: 20px; align-items: center; max-width: 500px; width: 90%; box-sizing: border-box;">
+
+                    <div
+                        style="width: 100%; background: var(--bg-secondary); padding: 25px; border-radius: 20px; border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+                        <div style="margin-bottom: 20px;">
+                            <h2 style="margin: 0 0 10px 0; color: #fff; font-size: 1.2rem;">1. Harita ve Eşleşme Seçimi
+                            </h2>
+
+                            <div style="margin-bottom: 15px;">
+                                <label
+                                    style="display:block; font-size:0.7rem; color:var(--accent); margin-bottom:5px; font-weight:600; text-transform:uppercase;">Çalışma
+                                    Haritası (İl/Bölge)</label>
+                                <select id="overlay-city-select"
+                                    style="background:#0f172a; border-color:rgba(59,130,246,0.3); font-weight:500;">
+                                    <option value="">Yükleniyor...</option>
+                                </select>
+                            </div>
+
+                            <div style="margin-bottom: 15px;">
+                                <label
+                                    style="display:block; font-size:0.7rem; color:var(--accent); margin-bottom:5px; font-weight:600; text-transform:uppercase;">Mahalle
+                                    Eşleşme Dosyası (.json)</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <select id="overlay-mapping-select"
+                                        style="flex:1; background:#0f172a; border-color:rgba(59,130,246,0.3); font-weight:500;">
+                                        <option value="">Yükleniyor...</option>
+                                    </select>
+                                    <button onclick="document.getElementById('overlay-local-mapping').click()"
+                                        style="padding:0 12px; font-size:0.75rem; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text-secondary); border-radius:6px; cursor:pointer; font-weight:500; transition:all 0.2s;">
+                                        Yerel Yükle
+                                    </button>
+                                    <input type="file" id="overlay-local-mapping" accept=".json" style="display: none;">
+                                </div>
+                                <div id="overlay-local-mapping-info"
+                                    style="font-size:0.7rem; color:var(--success); margin-top:6px; display:none;"></div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px;">
+                                <a href="index_eslesme.html" id="edit-mappings-link"
+                                    style="flex:1; text-decoration:none; text-align:center; padding:10px; font-size:0.75rem; background:rgba(59,130,246,0.1); border:1px solid var(--accent); color:var(--accent); border-radius:8px; cursor:pointer; font-weight:600; transition:all 0.2s;">
+                                    🛠️ Eşleşmeleri Düzenle
+                                </a>
+                            </div>
                         </div>
-                        <div>
-                            <label>Payda (Alt Değer)</label>
-                            <select id="col-denominator"></select>
-                            <label class="switch" style="margin-top:5px; display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                <input type="checkbox" id="count-den-toggle" style="width:auto; cursor:pointer;">
-                                <span style="font-size:0.7rem; color:var(--text-secondary);">Payda için adeti kullan</span>
-                            </label>
+
+                        <div style="border-top: 1px solid var(--border); padding-top: 20px;">
+                            <h2 style="margin: 0 0 10px 0; color: #fff; font-size: 1.2rem;">2. Excel Verisini Yükle</h2>
+                            <div class="drop-zone" id="drop-zone" style="padding: 30px 20px;">
+                                <div style="font-size: 3rem; margin-bottom: 10px;">📄</div>
+                                <p
+                                    style="color: var(--text-secondary); margin: 0; font-size: 0.85rem; font-weight:500;">
+                                    Dosyayı buraya bırakın veya <br><span style="color:var(--accent)">tıklayıp
+                                        seçin</span></p>
+                                <input type="file" id="file-input" style="display: none;" accept=".xls,.xlsx" />
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="section-title">Harita Ayarları</div>
-                <div class="control-group">
-                    <label>Lejant Hassasiyeti (Basamak)</label>
-                    <select id="legend-steps">
-                        <option value="3">3 Basamak (Basit)</option>
-                        <option value="5" selected>5 Basamak (Standart)</option>
-                        <option value="8">8 Basamak (Detaylı)</option>
-                        <option value="10">10 Basamak (Hassas)</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <label style="margin-bottom:0">Yoğunluk Skalası (Üst Limit)</label>
-                        <label class="switch" style="margin-bottom:0; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                            <input type="checkbox" id="manual-max-toggle" style="width:auto; cursor:pointer;">
-                            <span style="font-size:0.65rem; color:var(--text-secondary);">Manuel</span>
-                        </label>
-                    </div>
-                    <div id="slider-container" style="display: flex; align-items: center; gap: 10px; opacity: 0.4; pointer-events: none;">
-                        <input type="range" id="max-limit-slider" min="1" max="10000" value="1000" style="flex: 1; accent-color: var(--accent);">
-                        <input type="number" id="max-limit-val" style="font-size: 0.8rem; width: 65px; text-align: right; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: white; padding: 4px;" value="0">
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>Renk Teması</label>
-                    <select id="palette-select">
-                        <option value="GYR">Performans (Yeşil -> Kırmızı)</option>
-                        <option value="RYG">Risk (Kırmızı -> Yeşil)</option>
-                        <option value="OCEAN">Okyanus (Mavi Tonları)</option>
-                        <option value="PURPLE">Kıvılcım (Mor -> Turuncu)</option>
-                        <option value="TRAFFIC">Trafik (G-S-K)</option>
-                    </select>
-                </div>
-
-                <div class="section-title">Görünüm ve Filtre</div>
-                <div class="control-group">
-                    <label>Çalışma Haritası (İl/Bölge)</label>
-                    <select id="city-select">
-                        <option value="">Yükleniyor...</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label>Harita Düzeyi</label>
-                    <div class="btn-toggle-group" id="view-toggle" style="margin-bottom: 12px;">
-                        <button data-view="mahalle" class="active">Mahalle</button>
-                        <button data-view="ilce">İlçe</button>
-                    </div>
-                    <label>İlçe Filtresi</label>
-                    <select id="ilce-filter">
-                        <option value="all">Tüm Liste</option>
-                    </select>
-                </div>
-
-                <div id="summary-card" class="control-group" style="font-size: 0.85rem; line-height: 1.8;">
-                    <div style="font-weight: 700; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">📊 ANALİTİK ÖZET</div>
-                    <div id="stat-total">Toplam: -</div>
-                    <div id="stat-avg">Ortalama: -</div>
-                    <div id="stat-match">Eşleşme: %-</div>
-                </div>
-
-                <div class="control-group">
-                    <label>Eşleşme Dosyası (.json)</label>
-                    <select id="overlay-mapping-select-static"></select>
-                    <div id="selected-mapping-info" style="font-size:0.65rem; color:var(--success); margin-top:4px; display:none;"></div>
-                </div>
-
-                <button id="re-upload" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 8px; color: var(--text-secondary); cursor: pointer; margin-top: 10px;">Yeni Excel Yükle</button>
             </div>
 
-            <div id="welcome-msg" style="margin-top: 50px; text-align: center; color: var(--text-secondary);">
-                <div style="font-size: 4rem; opacity: 0.1; margin-bottom: 20px;">🛡️</div>
-                <p>Verileri haritaya yansıtmak ve analiz yapmak için bir Excel dosyası yükleyin.</p>
-                <button id="pwa-install-btn" style="display:none; margin: 20px auto; padding: 12px 25px; background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent); color: var(--accent); border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);">
-                    📥 Uygulama Olarak Yükle
-                </button>
+            <div id="legend">
+                <div id="legend-header" onclick="toggleLegend()"
+                    style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none;">
+                    <div id="legend-title"
+                        style="font-size: 0.75rem; font-weight: 800; color: var(--accent); letter-spacing: 0.05em;">
+                        YOĞUNLUK SKALASI</div>
+                    <span id="legend-toggle-btn"
+                        style="font-size:0.8rem; color:var(--accent); padding-left:8px;">▲</span>
+                </div>
+                <div id="legend-body" style="margin-top:12px;"></div>
             </div>
         </div>
     </div>
 
-    <div id="map-container">
-        <div id="map"></div>
-        <div id="upload-overlay">
-            <div style="display: flex; flex-direction: column; gap: 20px; align-items: center; max-width: 500px; width: 90%;">
-                
-                <div style="width: 100%; background: var(--bg-secondary); padding: 25px; border-radius: 20px; border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
-                    <div style="margin-bottom: 20px;">
-                        <h2 style="margin: 0 0 10px 0; color: #fff; font-size: 1.2rem;">1. Harita ve Eşleşme Seçimi</h2>
-                        
-                        <div style="margin-bottom: 15px;">
-                            <label style="display:block; font-size:0.7rem; color:var(--accent); margin-bottom:5px; font-weight:600; text-transform:uppercase;">Çalışma Haritası (İl/Bölge)</label>
-                            <select id="overlay-city-select" style="background:#0f172a; border-color:rgba(59,130,246,0.3); font-weight:500;">
-                                <option value="">Yükleniyor...</option>
-                            </select>
-                        </div>
-                        
-                        <div style="margin-bottom: 15px;">
-                            <label style="display:block; font-size:0.7rem; color:var(--accent); margin-bottom:5px; font-weight:600; text-transform:uppercase;">Mahalle Eşleşme Dosyası (.json)</label>
-                            <select id="overlay-mapping-select" style="background:#0f172a; border-color:rgba(59,130,246,0.3); font-weight:500;">
-                                <option value="">Yükleniyor...</option>
-                            </select>
-                        </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 
-                        <div style="display: flex; gap: 10px;">
-                            <a href="index_eslesme.html" id="edit-mappings-link" style="flex:1; text-decoration:none; text-align:center; padding:10px; font-size:0.75rem; background:rgba(59,130,246,0.1); border:1px solid var(--accent); color:var(--accent); border-radius:8px; cursor:pointer; font-weight:600; transition:all 0.2s;">
-                                🛠️ Eşleşmeleri Düzenle
-                            </a>
-                        </div>
-                    </div>
-
-                    <div style="border-top: 1px solid var(--border); padding-top: 20px;">
-                        <h2 style="margin: 0 0 10px 0; color: #fff; font-size: 1.2rem;">2. Excel Verisini Yükle</h2>
-                        <div class="drop-zone" id="drop-zone" style="padding: 30px 20px;">
-                            <div style="font-size: 3rem; margin-bottom: 10px;">📄</div>
-                            <p style="color: var(--text-secondary); margin: 0; font-size: 0.85rem; font-weight:500;">Dosyayı buraya bırakın veya <br><span style="color:var(--accent)">tıklayıp seçin</span></p>
-                            <input type="file" id="file-input" style="display: none;" accept=".xls,.xlsx" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="legend">
-            <div id="legend-header" onclick="toggleLegend()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none;">
-                <div id="legend-title" style="font-size: 0.75rem; font-weight: 800; color: var(--accent); letter-spacing: 0.05em;">YOĞUNLUK SKALASI</div>
-                <span id="legend-toggle-btn" style="font-size:0.8rem; color:var(--accent); padding-left:8px;">▲</span>
-            </div>
-            <div id="legend-body" style="margin-top:12px;"></div>
-        </div>
-    </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-
-<script>
-    // --- PWA Registration & Install Prompt ---
-    let deferredPrompt;
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
-    }
-    
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        const installBtn = document.getElementById('pwa-install-btn');
-        if (installBtn) {
-            installBtn.style.display = 'block';
-            installBtn.addEventListener('click', () => {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        installBtn.style.display = 'none';
-                    }
-                    deferredPrompt = null;
-                });
-            });
+    <script>
+        // --- PWA Registration & Install Prompt ---
+        let deferredPrompt;
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
         }
-    });
 
-    // --- State ---
-    let map, geoJsonLayer;
-    let geoData = null, mappingData = null, excelData = null;
-    let stats = { mahalle: {}, ilce: {} };
-    let config = { 
-        mode: 'single', view: 'mahalle', column: '', numerator: '', denominator: '', 
-        ilce: 'all', palette: 'GYR', legendSteps: 5, manualMax: null, city: '', mapping: '', 
-        useCountSingle: false, useCountNum: false, useCountDen: false
-    };
-
-    const PALETTES = {
-        'GYR': ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'],
-        'RYG': ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'],
-        'OCEAN': ['#eff6ff', '#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'],
-        'PURPLE': ['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#fb923c'],
-        'TRAFFIC': ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e']
-    };
-
-    async function init() {
-        showLoader(true);
-        map = L.map('map', { center: [37.15, 28.36], zoom: 9, zoomControl: false, attributionControl: false });
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-        
-        await Promise.all([
-            fetchMapSources(),
-            fetchMappingSources()
-        ]);
-        
-        setupEvents(); 
-        showLoader(false);
-    }
-    
-    async function fetchMapSources() {
-        try {
-            const sideSel = document.getElementById('city-select');
-            const overlaySel = document.getElementById('overlay-city-select');
-            const res = await fetch('maps.json?t=' + new Date().getTime());
-            const data = await res.json();
-            
-            let lastCity = localStorage.getItem('lastSavedCityPath');
-            
-            const fillSelect = (sel) => {
-                sel.innerHTML = '';
-                if (data.status === 'success' && data.maps.length > 0) {
-                    let mapExists = false;
-                    data.maps.forEach(m => {
-                        const opt = document.createElement('option');
-                        opt.value = m.path;
-                        opt.textContent = m.name;
-                        if (lastCity && m.path === lastCity) {
-                            opt.selected = true;
-                            mapExists = true;
-                        } else if (!lastCity && m.file.includes('Mugla')) {
-                             opt.selected = true;
-                             mapExists = true;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                installBtn.style.display = 'block';
+                installBtn.addEventListener('click', () => {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            installBtn.style.display = 'none';
                         }
-                        sel.appendChild(opt);
+                        deferredPrompt = null;
                     });
-                    if (!lastCity || !mapExists) localStorage.setItem('lastSavedCityPath', sel.value);
-                    return sel.value;
-                }
-                return '';
-            };
-            
-            config.city = fillSelect(sideSel);
-            fillSelect(overlaySel);
-            overlaySel.value = config.city;
-            updateEditLink();
-        } catch(err) { console.error("Harita kaynakları yüklenemedi", err); }
-    }
-
-    async function fetchMappingSources() {
-        try {
-            const overlaySel = document.getElementById('overlay-mapping-select');
-            const sideSel = document.getElementById('overlay-mapping-select-static');
-            const res = await fetch('mappings.json?t=' + new Date().getTime());
-            const data = await res.json();
-            
-            let lastMapping = localStorage.getItem('lastSavedMappingPath');
-            
-            const fill = (sel) => {
-                if(!sel) return;
-                sel.innerHTML = '';
-                if (data.status === 'success' && data.files.length > 0) {
-                    data.files.forEach(f => {
-                        const opt = document.createElement('option');
-                        opt.value = f.path;
-                        opt.textContent = f.name;
-                        if (lastMapping && f.path === lastMapping) opt.selected = true;
-                        sel.appendChild(opt);
-                    });
-                    return sel.value;
-                }
-            };
-            
-            config.mapping = fill(overlaySel);
-            fill(sideSel);
-            if(sideSel) sideSel.value = config.mapping;
-        } catch(err) { console.error("Eşleşme kaynakları yüklenemedi", err); }
-    }
-
-    function processExcel(json) {
-        excelData = json;
-        const columns = Object.keys(json[0]);
-        const numericCols = columns.filter(col => {
-            const key = col.toString().toLocaleUpperCase('tr-TR');
-            const whiteList = ['BRUSELLOZ', 'ÇİÇEK', 'VEBA', 'SEPTİSEMİ', 'ŞAP', 'AŞI', 'HAYVAN', 'SAYI'];
-            if (whiteList.some(w => key.includes(w))) return true;
-            const forbiddenKeys = ['TC', 'KİMLİK', 'KIMLIK', 'VERGİ', 'VKN', 'IDENTIFIER', 'PASAPORT'];
-            if (forbiddenKeys.some(f => key.includes(f))) return false;
-            let hasNumber = false;
-            for(let i=0; i < Math.min(json.length, 50); i++) {
-                let currentVal = json[i][col]; if (currentVal === undefined || currentVal === null || currentVal === "") continue;
-                let parsedVal;
-                if (typeof currentVal === 'number') {
-                    parsedVal = currentVal;
-                } else {
-                    let strVal = currentVal.toString().trim();
-                    if (strVal.includes(',')) parsedVal = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
-                    else parsedVal = parseFloat(strVal);
-                }
-                if (!isNaN(parsedVal) && parsedVal < 1000000000) { hasNumber = true; break; }
-            }
-            return hasNumber;
-        });
-        
-        if (numericCols.length === 0) { alert("Sayısal veri bulunamadı!"); return; }
-        fillSelects(['col-single', 'col-numerator', 'col-denominator'], numericCols);
-        const mCol = columns.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('MAHALLE') || k === 'AD' || k.includes('KÖY'); });
-        const iCol = columns.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('İLÇE') || k.includes('ILCE'); });
-
-        stats.mahalle = {}; stats.ilce = {}; stats.matchedCount = 0;
-        json.forEach(row => {
-            let mNameRaw = row[mCol]?.toString() || "";
-            let iNameRaw = row[iCol]?.toString() || "";
-            let mName = mNameRaw.toLocaleUpperCase('tr-TR').replace(/\s+(MAHALLESİ|MAHALLE|KÖYÜ|KÖY)\b/g, '').replace(/\s+MAH\./g, '').trim();
-            let iName = iNameRaw.toLocaleUpperCase('tr-TR').trim();
-            if (mName.endsWith(" MAHALLESİ")) mName = mName.replace(" MAHALLESİ", "");
-
-            let match = null;
-            if (iName && mappingData.eslesmeler[`${iName}|${mName}`]) {
-                // Tam anahtar eşleşmesi: İlçe|Mahalle
-                match = mappingData.eslesmeler[`${iName}|${mName}`];
-            } else if (iName) {
-                // Tam anahtar bulunamadı ama ilçe bilgisi var;
-                // sadece aynı ilçeye ait mahalleler arasında ara
-                match = Object.values(mappingData.eslesmeler).find(e =>
-                    e.sistemIlce === iName && e.sistemMahalle === mName
-                );
-            } else {
-                // İlçe bilgisi hiç yok; tüm mapping'de ara (yedek)
-                match = Object.values(mappingData.eslesmeler).find(e => e.sistemMahalle === mName);
-            }
-            
-            if (match) {
-                stats.matchedCount++; const ilceKey = match.sistemIlce;
-                if (!stats.ilce[ilceKey]) stats.ilce[ilceKey] = { total: 0, count: 0, mCount: 0, sums: {}, counts: {} };
-                stats.ilce[ilceKey].count++;
-
-                // 1. Adım: Excel satırındaki değerleri ONCE hesapla ve ilçeye ekle
-                const rowVals = {};
-                numericCols.forEach(col => {
-                    let currentVal = row[col];
-                    let val = 0;
-                    if (typeof currentVal === 'number') {
-                        val = currentVal;
-                    } else if (currentVal !== undefined && currentVal !== null && currentVal !== "") {
-                        let strVal = currentVal.toString().trim();
-                        if (strVal.includes(',')) val = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
-                        else val = parseFloat(strVal);
-                    }
-                    val = val || 0;
-                    rowVals[col] = val;
-                    // İlçe toplamına SADECE BIR KEZ ekle (mahalle döngüsünden bağımsız)
-                    stats.ilce[ilceKey].sums[col] = (stats.ilce[ilceKey].sums[col] || 0) + val;
-                    if (val !== 0) {
-                        stats.ilce[ilceKey].counts[col] = (stats.ilce[ilceKey].counts[col] || 0) + 1;
-                    }
-                });
-
-                // 2. Adım: Aynı değleri tüm eşleşen mahalle ID'lerine dağıt
-                match.eslesmeler.forEach(id => {
-                    if (!stats.mahalle[id]) stats.mahalle[id] = { total: 0, count: 0, sums: {}, counts: {}, sistemMahalle: match.sistemMahalle };
-                    const mObj = stats.mahalle[id];
-                    numericCols.forEach(col => {
-                        const val = rowVals[col];
-                        mObj.sums[col] = (mObj.sums[col] || 0) + val;
-                        if (val !== 0) {
-                            mObj.counts[col] = (mObj.counts[col] || 0) + 1;
-                        }
-                    });
-                    mObj.count++;
                 });
             }
         });
-        refreshVisuals();
-        document.getElementById('upload-overlay').classList.add('hidden');
-        document.getElementById('data-controls').classList.remove('hidden');
-        document.getElementById('welcome-msg').classList.add('hidden');
-    }
 
-    async function handleFile(file) {
-        if (!file && !excelData) return;
-        showLoader(true);
-        try {
-            const mapUrl = document.getElementById('overlay-city-select').value;
-            const mappingUrl = document.getElementById('overlay-mapping-select').value;
-            const [rg, rm] = await Promise.all([
-                fetch(mapUrl + '?t=' + new Date().getTime()).then(r => r.json()),
-                fetch(mappingUrl + '?t=' + new Date().getTime()).then(r => r.json())
+        // --- State ---
+        let map, geoJsonLayer;
+        let geoData = null, mappingData = null, excelData = null;
+        let stats = { mahalle: {}, ilce: {} };
+        let config = {
+            mode: 'single', view: 'mahalle', column: '', numerator: '', denominator: '',
+            ilce: 'all', palette: 'GYR', legendSteps: 5, manualMax: null, city: '', mapping: '',
+            useCountSingle: false, useCountNum: false, useCountDen: false
+        };
+
+        const PALETTES = {
+            'GYR': ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'],
+            'RYG': ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'],
+            'OCEAN': ['#eff6ff', '#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'],
+            'PURPLE': ['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#fb923c'],
+            'TRAFFIC': ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e']
+        };
+
+        async function init() {
+            showLoader(true);
+            map = L.map('map', { center: [37.15, 28.36], zoom: 9, zoomControl: false, attributionControl: false });
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            await Promise.all([
+                fetchMapSources(),
+                fetchMappingSources()
             ]);
-            geoData = rg; mappingData = rm;
-            
-            const ilceler = [...new Set(geoData.features.map(f => f.properties.ILCEAD))].sort((a,b) => String(a).localeCompare(String(b), 'tr'));
-            const ilceSel = document.getElementById('ilce-filter');
-            ilceSel.innerHTML = '<option value="all">Tüm Liste</option>';
-            ilceler.forEach(i => { if(i) { const o = document.createElement('option'); o.value = i; o.textContent = i; ilceSel.appendChild(o); } });
-            
-            renderMap();
-            if (file) {
-                const reader = new FileReader(); 
-                reader.onload = (e) => { 
-                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' }); 
-                    excelData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
-                    processExcel(excelData); 
+
+            setupEvents();
+            showLoader(false);
+        }
+
+        async function fetchMapSources() {
+            try {
+                const sideSel = document.getElementById('city-select');
+                const overlaySel = document.getElementById('overlay-city-select');
+                const res = await fetch('maps.json?t=' + new Date().getTime());
+                const data = await res.json();
+
+                let lastCity = localStorage.getItem('lastSavedCityPath');
+
+                const fillSelect = (sel) => {
+                    sel.innerHTML = '';
+                    if (data.status === 'success' && data.maps.length > 0) {
+                        let mapExists = false;
+                        data.maps.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.path;
+                            opt.textContent = m.name;
+                            if (lastCity && m.path === lastCity) {
+                                opt.selected = true;
+                                mapExists = true;
+                            } else if (!lastCity && m.file.includes('Mugla')) {
+                                opt.selected = true;
+                                mapExists = true;
+                            }
+                            sel.appendChild(opt);
+                        });
+                        if (!lastCity || !mapExists) localStorage.setItem('lastSavedCityPath', sel.value);
+                        return sel.value;
+                    }
+                    return '';
                 };
-                reader.readAsArrayBuffer(file);
-            } else if (excelData) processExcel(excelData);
-        } catch(err) { alert("Veri yüklenemedi!"); console.error(err); }
-        finally { showLoader(false); }
-    }
 
-    function calculateValue(dataObj) {
-        if (!dataObj) return 0;
-        if (config.mode === 'single') return config.useCountSingle ? (dataObj.counts[config.column] || 0) : (dataObj.sums[config.column] || 0);
-        const num = config.useCountNum ? (dataObj.counts[config.numerator] || 0) : (dataObj.sums[config.numerator] || 0);
-        const den = config.useCountDen ? (dataObj.counts[config.denominator] || 0) : (dataObj.sums[config.denominator] || 0);
-        return den === 0 ? 0 : (num / den) * 100;
-    }
-
-    // Mahalle istatistiklerini sistem mahallesi bazında tekilleştirir
-    // (aynı sistemMahalle'ye bağlı birden fazla GeoJSON ID'sini tek sayar)
-    function getUniqueMahalleItems(targetI) {
-        const seen = new Set();
-        const items = [];
-        Object.entries(stats.mahalle).forEach(([id, m]) => {
-            const ilce = getIlceById(id);
-            if (targetI !== 'all' && ilce !== targetI) return;
-            const key = `${ilce}|${m.sistemMahalle}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                items.push({ id, val: calculateValue(m), ilce });
-            }
-        });
-        return items;
-    }
-
-    function refreshVisuals() {
-        const view = config.view; const targetI = config.ilce; const steps = parseInt(config.legendSteps);
-        let activeItems = [];
-        if (view === 'mahalle') {
-            // Tekil sistem mahallelerini kullan (çok-ID eşleşmeleri tek sayılır)
-            activeItems = getUniqueMahalleItems(targetI);
-        } else {
-            activeItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
-            if (targetI !== 'all') activeItems = activeItems.filter(x => x.ilce === targetI);
-        }
-        
-        const vals = activeItems.map(x => x.val).filter(v => v > 0);
-        const min = vals.length ? Math.min(...vals) : 0, maxOrig = vals.length ? Math.max(...vals) : 0;
-        
-        const isManual = document.getElementById('manual-max-toggle').checked;
-        const slider = document.getElementById('max-limit-slider');
-        
-        if (!isManual) {
-            config.manualMax = maxOrig;
-            slider.value = maxOrig;
-            document.getElementById('max-limit-val').value = Math.ceil(maxOrig);
-        } else {
-            config.manualMax = parseFloat(slider.value);
-            document.getElementById('max-limit-val').value = Math.ceil(config.manualMax);
+                config.city = fillSelect(sideSel);
+                fillSelect(overlaySel);
+                overlaySel.value = config.city;
+                updateEditLink();
+            } catch (err) { console.error("Harita kaynakları yüklenemedi", err); }
         }
 
-        let maxLegend = config.manualMax !== null ? config.manualMax : maxOrig;
-        if (config.mode === 'percent' && maxLegend > 100) maxLegend = 100;
+        async function fetchMappingSources() {
+            try {
+                const overlaySel = document.getElementById('overlay-mapping-select');
+                const sideSel = document.getElementById('overlay-mapping-select-static');
+                const res = await fetch('mappings.json?t=' + new Date().getTime());
+                const data = await res.json();
 
-        geoJsonLayer.eachLayer(layer => {
-            const props = layer.feature.properties; const id = props.KIMLIKNO, ilce = props.ILCEAD;
-            const isVisible = (targetI === 'all' || ilce === targetI);
-            if (!isVisible) { 
-                layer.setStyle({ opacity: 0, fillOpacity: 0, fillColor: 'transparent', color: 'transparent', interactive: false }); 
-                return; 
-            }
-            
-            const val = (view === 'mahalle') ? calculateValue(stats.mahalle[id]) : calculateValue(stats.ilce[ilce]);
-            layer.setStyle({ fillColor: getColor(val, min, maxLegend, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#475569', weight: view === 'ilce' ? 0.3 : 0.7, opacity: 1, interactive: true });
-        });
-        renderLegend(min, maxLegend, steps);
-        updateSummaryCard();
-    }
+                let lastMapping = localStorage.getItem('lastSavedMappingPath');
 
-    function getColor(v, min, max, steps) {
-        if (v === 0 || isNaN(v)) return 'rgba(203, 213, 225, 0.4)';
-        if (config.mode === 'percent' && max > 100) max = 100;
-        const range = max - min;
-        const paletteColors = PALETTES[config.palette];
-        if (range <= 0) return paletteColors[paletteColors.length - 1];
-        
-        const p = Math.min(1, (v - min) / range);
-        const index = Math.floor(p * steps);
-        const colorIndex = Math.floor((index / steps) * paletteColors.length);
-        return paletteColors[Math.min(colorIndex, paletteColors.length - 1)];
-    }
+                const fill = (sel) => {
+                    if (!sel) return;
+                    sel.innerHTML = '';
+                    if (data.status === 'success' && data.files.length > 0) {
+                        data.files.forEach(f => {
+                            const opt = document.createElement('option');
+                            opt.value = f.path;
+                            opt.textContent = f.name;
+                            if (lastMapping && f.path === lastMapping) opt.selected = true;
+                            sel.appendChild(opt);
+                        });
+                        return sel.value;
+                    }
+                };
 
-    function updateSummaryCard() {
-        if (!excelData) return;
-
-        // TOPLAM: Her zaman ilce stats'indan hesapla (GeoJSON'da karsiliksiz mahalleler de dahil olur)
-        // Bu sayede Mahalle/Ilce gorunum degisince toplam degismez
-        let ilceItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
-        if (config.ilce !== 'all') ilceItems = ilceItems.filter(x => x.ilce === config.ilce);
-        const totalVals = ilceItems.map(x => x.val);
-        const total = totalVals.reduce((a, b) => a + b, 0);
-
-        // ORTALAMA: Gorunume gore farkli bolucuyle hesapla
-        let avgDivisor = 1;
-        if (config.view === 'mahalle') {
-            // Benzersiz sistem mahallesi sayisi
-            avgDivisor = getUniqueMahalleItems(config.ilce).length || 1;
-        } else {
-            avgDivisor = ilceItems.length || 1;
+                config.mapping = fill(overlaySel);
+                fill(sideSel);
+                if (sideSel) sideSel.value = config.mapping;
+            } catch (err) { console.error("Eşleşme kaynakları yüklenemedi", err); }
         }
 
-        document.getElementById('stat-total').innerHTML = `Toplam: <b style="color:#fff">${total.toLocaleString('tr', {maximumFractionDigits: 2})}${config.mode==='percent'?'%':''}</b>`;
-        document.getElementById('stat-avg').innerHTML = `Ortalama: <b style="color:#fff">${(total / avgDivisor).toLocaleString('tr', {maximumFractionDigits: 2})}${config.mode==='percent'?'%':''}</b>`;
-        document.getElementById('stat-match').innerHTML = `Eşleşme: <b style="color:#fff">%${((stats.matchedCount / excelData.length) * 100).toFixed(1)}</b>`;
-    }
-
-    function renderLegend(min, max, steps) {
-        const body = document.getElementById('legend-body'); body.innerHTML = '';
-        const nullItem = document.createElement('div'); nullItem.className = 'legend-item';
-        nullItem.innerHTML = `<div class="color-box" style="background:rgba(203, 213, 225, 0.4)"></div> <span>Veri Yok / Sabit</span>`;
-        body.appendChild(nullItem);
-        
-        const paletteColors = PALETTES[config.palette];
-        const r = max - min, stepSize = r / steps;
-        for (let i = 0; i < steps; i++) {
-            const s = min + (i * stepSize), e = min + ((i+1) * stepSize);
-            const colorIndex = Math.floor((i / steps) * paletteColors.length);
-            const color = paletteColors[Math.min(colorIndex, paletteColors.length - 1)];
-            
-            body.innerHTML += `<div class="legend-item"><div class="color-box" style="background:${color}"></div><span>${s.toLocaleString('tr', {maximumFractionDigits: 0})}${config.mode === 'percent' ? '%' : ''} - ${e.toLocaleString('tr', {maximumFractionDigits: 0})}${config.mode === 'percent' ? '%' : ''}</span></div>`;
-        }
-    }
-
-    function renderMap() {
-        if (geoJsonLayer) map.removeLayer(geoJsonLayer);
-        geoJsonLayer = L.geoJSON(geoData, {
-            style: { weight: 0.5, color: '#475569', fillOpacity: 0.15, fillColor: 'rgba(203, 213, 225, 0.3)' },
-            onEachFeature: (f, l) => {
-                l.on({
-                    click: (e) => { if (e.target.options.opacity !== 0) showDetails(e.target.feature.properties, e.latlng); }
-                });
-            }
-        }).addTo(map);
-    }
-
-    function showDetails(props, latlng) {
-        const id = props.KIMLIKNO, ilce = props.ILCEAD;
-        const data = (config.view === 'mahalle') ? stats.mahalle[id] : stats.ilce[ilce];
-        
-        let matchInfo = null;
-        if (mappingData && mappingData.eslesmeler) {
-            matchInfo = Object.values(mappingData.eslesmeler).find(e => e.eslesmeler && (e.eslesmeler.includes(String(id)) || e.eslesmeler.includes(Number(id))));
-        }
-
-        let displayName = `<span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:4px;">${ilce}</span>`;
-        if (config.view === 'mahalle') {
-            displayName += props.AD;
-            if (data?.sistemMahalle) {
-                displayName += `<br><span style="font-size:0.85rem; color:var(--accent);">Sistem: ${data.sistemMahalle}</span>`;
-            } else if (matchInfo) {
-                displayName += `<br><span style="font-size:0.85rem; color:var(--accent);">Sistem: ${matchInfo.sistemMahalle}</span>`;
-            }
-        } else if (config.view === 'ilce') {
-            displayName = ilce;
-        }
-
-        let content = `<div style="font-weight:700; font-size:1.1rem; border-bottom:3px solid var(--accent); padding-bottom:10px; margin-bottom:15px; line-height:1.4">${displayName}</div>`;
-        
-        if (data) {
-            if (config.mode === 'percent') {
-                const ratio = calculateValue(data);
-                content += `<div style="background:rgba(59,130,246,0.2); padding:10px; border-radius:8px; border:1px solid var(--accent); margin-bottom:15px; text-align:center"><div style="font-size:0.75rem; color:var(--text-secondary)">HESAPLANAN ORAN</div><div style="font-size:1.8rem; font-weight:800; color:#fff">%${ratio.toLocaleString('tr', {maximumFractionDigits: 2})}</div></div>`;
-            }
-            content += `<table class="popup-table">`;
-            for (let [k, v] of Object.entries(data.sums)) {
-                const isSingleH = (config.mode === 'single' && k === config.column);
-                const isNumH = (config.mode === 'percent' && k === config.numerator);
-                const isDenH = (config.mode === 'percent' && k === config.denominator);
-                const isH = isSingleH || isNumH || isDenH;
-                
-                content += `<tr class="${isH ? 'highlight' : ''}"><td>${k}</td><td style="text-align:right"><b>${v.toLocaleString('tr', {maximumFractionDigits: 2})}</b></td></tr>`;
-                
-                if (isSingleH && config.useCountSingle) {
-                    content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet bilgisi)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+        function processExcel(json) {
+            excelData = json;
+            const columns = Object.keys(json[0]);
+            const numericCols = columns.filter(col => {
+                const key = col.toString().toLocaleUpperCase('tr-TR');
+                const whiteList = ['BRUSELLOZ', 'ÇİÇEK', 'VEBA', 'SEPTİSEMİ', 'ŞAP', 'AŞI', 'HAYVAN', 'SAYI'];
+                if (whiteList.some(w => key.includes(w))) return true;
+                const forbiddenKeys = ['TC', 'KİMLİK', 'KIMLIK', 'VERGİ', 'VKN', 'IDENTIFIER', 'PASAPORT'];
+                if (forbiddenKeys.some(f => key.includes(f))) return false;
+                let hasNumber = false;
+                for (let i = 0; i < Math.min(json.length, 50); i++) {
+                    let currentVal = json[i][col]; if (currentVal === undefined || currentVal === null || currentVal === "") continue;
+                    let parsedVal;
+                    if (typeof currentVal === 'number') {
+                        parsedVal = currentVal;
+                    } else {
+                        let strVal = currentVal.toString().trim();
+                        if (strVal.includes(',')) parsedVal = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
+                        else parsedVal = parseFloat(strVal);
+                    }
+                    if (!isNaN(parsedVal) && parsedVal < 1000000000) { hasNumber = true; break; }
                 }
-                if (isNumH && config.useCountNum) {
-                    content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet - Pay)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+                return hasNumber;
+            });
+
+            if (numericCols.length === 0) { alert("Sayısal veri bulunamadı!"); return; }
+            fillSelects(['col-single', 'col-numerator', 'col-denominator'], numericCols);
+            const mCol = columns.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('MAHALLE') || k === 'AD' || k.includes('KÖY'); });
+            const iCol = columns.find(c => { const k = c.toString().toLocaleUpperCase('tr-TR'); return k.includes('İLÇE') || k.includes('ILCE'); });
+
+            stats.mahalle = {}; stats.ilce = {}; stats.matchedCount = 0;
+            json.forEach(row => {
+                let mNameRaw = row[mCol]?.toString() || "";
+                let iNameRaw = row[iCol]?.toString() || "";
+                let mName = mNameRaw.toLocaleUpperCase('tr-TR').replace(/\s+(MAHALLESİ|MAHALLE|KÖYÜ|KÖY)\b/g, '').replace(/\s+MAH\./g, '').trim();
+                let iName = iNameRaw.toLocaleUpperCase('tr-TR').trim();
+                if (mName.endsWith(" MAHALLESİ")) mName = mName.replace(" MAHALLESİ", "");
+
+                let match = null;
+                const hasMapping = mappingData && mappingData.eslesmeler;
+
+                if (hasMapping) {
+                    if (iName && mappingData.eslesmeler[`${iName}|${mName}`]) {
+                        match = mappingData.eslesmeler[`${iName}|${mName}`];
+                    } else if (iName) {
+                        match = Object.values(mappingData.eslesmeler).find(e =>
+                            e.sistemIlce === iName && e.sistemMahalle === mName
+                        );
+                    } else {
+                        match = Object.values(mappingData.eslesmeler).find(e => e.sistemMahalle === mName);
+                    }
                 }
-                if (isDenH && config.useCountDen && (!isNumH || !config.useCountNum)) {
-                    content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet - Payda)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+
+                // Eşleşme dosyası yoksa veya dosyada bulunamadıysa: GeoJSON içindeki AD ile direkt eşleşme dene
+                if (!match) {
+                    const directMatch = geoData.features.find(f => {
+                        const ad = (f.properties.AD || f.properties.MAHALLE || "").toLocaleUpperCase('tr-TR').trim();
+                        const ilce = (f.properties.ILCEAD || f.properties.ilce || "").toLocaleUpperCase('tr-TR').trim();
+                        return ad === mName && (iName === "" || ilce === iName);
+                    });
+
+                    if (directMatch) {
+                        match = {
+                            sistemIlce: iName || directMatch.properties.ILCEAD || "BİLİNMİYOR",
+                            sistemMahalle: mName,
+                            eslesmeler: [directMatch.properties.KIMLIKNO]
+                        };
+                    }
                 }
+
+                if (match) {
+                    stats.matchedCount++; const ilceKey = match.sistemIlce;
+                    if (!stats.ilce[ilceKey]) stats.ilce[ilceKey] = { total: 0, count: 0, mCount: 0, sums: {}, counts: {} };
+                    stats.ilce[ilceKey].count++;
+
+                    // 1. Adım: Excel satırındaki değerleri ONCE hesapla ve ilçeye ekle
+                    const rowVals = {};
+                    numericCols.forEach(col => {
+                        let currentVal = row[col];
+                        let val = 0;
+                        if (typeof currentVal === 'number') {
+                            val = currentVal;
+                        } else if (currentVal !== undefined && currentVal !== null && currentVal !== "") {
+                            let strVal = currentVal.toString().trim();
+                            if (strVal.includes(',')) val = parseFloat(strVal.replace(/\./g, '').replace(',', '.'));
+                            else val = parseFloat(strVal);
+                        }
+                        val = val || 0;
+                        rowVals[col] = val;
+                        // İlçe toplamına SADECE BIR KEZ ekle (mahalle döngüsünden bağımsız)
+                        stats.ilce[ilceKey].sums[col] = (stats.ilce[ilceKey].sums[col] || 0) + val;
+                        if (val !== 0) {
+                            stats.ilce[ilceKey].counts[col] = (stats.ilce[ilceKey].counts[col] || 0) + 1;
+                        }
+                    });
+
+                    // 2. Adım: Aynı değleri tüm eşleşen mahalle ID'lerine dağıt
+                    match.eslesmeler.forEach(id => {
+                        if (!stats.mahalle[id]) stats.mahalle[id] = { total: 0, count: 0, sums: {}, counts: {}, sistemMahalle: match.sistemMahalle };
+                        const mObj = stats.mahalle[id];
+                        numericCols.forEach(col => {
+                            const val = rowVals[col];
+                            mObj.sums[col] = (mObj.sums[col] || 0) + val;
+                            if (val !== 0) {
+                                mObj.counts[col] = (mObj.counts[col] || 0) + 1;
+                            }
+                        });
+                        mObj.count++;
+                    });
+                }
+            });
+            refreshVisuals();
+            document.getElementById('upload-overlay').classList.add('hidden');
+            document.getElementById('data-controls').classList.remove('hidden');
+            document.getElementById('welcome-msg').classList.add('hidden');
+        }
+
+        async function handleFile(file) {
+            if (!file && !excelData) return;
+            showLoader(true);
+            try {
+                const mapUrl = document.getElementById('overlay-city-select').value;
+                const mappingUrl = document.getElementById('overlay-mapping-select').value;
+
+                const promises = [];
+                promises.push(fetch(mapUrl + '?t=' + new Date().getTime()).then(r => r.json()));
+
+                if (window.localMappingDataStr) {
+                    promises.push(Promise.resolve(JSON.parse(window.localMappingDataStr)));
+                } else if (mappingUrl) {
+                    promises.push(fetch(mappingUrl + '?t=' + new Date().getTime()).then(r => r.json()));
+                } else {
+                    promises.push(Promise.resolve({ eslesmeler: {} }));
+                }
+
+                const [rg, rm] = await Promise.all(promises);
+                geoData = rg;
+                mappingData = rm || { eslesmeler: {} };
+
+                const ilceler = [...new Set(geoData.features.map(f => f.properties.ILCEAD))].sort((a, b) => String(a).localeCompare(String(b), 'tr'));
+                const ilceSel = document.getElementById('ilce-filter');
+                ilceSel.innerHTML = '<option value="all">Tüm Liste</option>';
+                ilceler.forEach(i => { if (i) { const o = document.createElement('option'); o.value = i; o.textContent = i; ilceSel.appendChild(o); } });
+
+                renderMap();
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                        excelData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+                        processExcel(excelData);
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else if (excelData) processExcel(excelData);
+            } catch (err) { alert("Veri yüklenemedi!"); console.error(err); }
+            finally { showLoader(false); }
+        }
+
+        function calculateValue(dataObj) {
+            if (!dataObj) return 0;
+            if (config.mode === 'single') return config.useCountSingle ? (dataObj.counts[config.column] || 0) : (dataObj.sums[config.column] || 0);
+            const num = config.useCountNum ? (dataObj.counts[config.numerator] || 0) : (dataObj.sums[config.numerator] || 0);
+            const den = config.useCountDen ? (dataObj.counts[config.denominator] || 0) : (dataObj.sums[config.denominator] || 0);
+            return den === 0 ? 0 : (num / den) * 100;
+        }
+
+        // Mahalle istatistiklerini sistem mahallesi bazında tekilleştirir
+        // (aynı sistemMahalle'ye bağlı birden fazla GeoJSON ID'sini tek sayar)
+        function getUniqueMahalleItems(targetI) {
+            const seen = new Set();
+            const items = [];
+            Object.entries(stats.mahalle).forEach(([id, m]) => {
+                const ilce = getIlceById(id);
+                if (targetI !== 'all' && ilce !== targetI) return;
+                const key = `${ilce}|${m.sistemMahalle}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    items.push({ id, val: calculateValue(m), ilce });
+                }
+            });
+            return items;
+        }
+
+        function refreshVisuals() {
+            const view = config.view; const targetI = config.ilce; const steps = parseInt(config.legendSteps);
+            let activeItems = [];
+            if (view === 'mahalle') {
+                // Tekil sistem mahallelerini kullan (çok-ID eşleşmeleri tek sayılır)
+                activeItems = getUniqueMahalleItems(targetI);
+            } else {
+                activeItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
+                if (targetI !== 'all') activeItems = activeItems.filter(x => x.ilce === targetI);
             }
-            content += `</table>`;
-        } else {
-            if (matchInfo) {
-                content += `<div style="background:rgba(249, 115, 22, 0.1); padding:10px; border-radius:8px; border:1px solid rgba(249, 115, 22, 0.3); text-align:center;">
+
+            const vals = activeItems.map(x => x.val).filter(v => v > 0);
+            const min = vals.length ? Math.min(...vals) : 0, maxOrig = vals.length ? Math.max(...vals) : 0;
+
+            const isManual = document.getElementById('manual-max-toggle').checked;
+            const slider = document.getElementById('max-limit-slider');
+
+            if (!isManual) {
+                config.manualMax = maxOrig;
+                slider.value = maxOrig;
+                document.getElementById('max-limit-val').value = Math.ceil(maxOrig);
+            } else {
+                config.manualMax = parseFloat(slider.value);
+                document.getElementById('max-limit-val').value = Math.ceil(config.manualMax);
+            }
+
+            let maxLegend = config.manualMax !== null ? config.manualMax : maxOrig;
+            if (config.mode === 'percent' && maxLegend > 100) maxLegend = 100;
+
+            geoJsonLayer.eachLayer(layer => {
+                const props = layer.feature.properties; const id = props.KIMLIKNO, ilce = props.ILCEAD;
+                const isVisible = (targetI === 'all' || ilce === targetI);
+                if (!isVisible) {
+                    layer.setStyle({ opacity: 0, fillOpacity: 0, fillColor: 'transparent', color: 'transparent', interactive: false });
+                    return;
+                }
+
+                const val = (view === 'mahalle') ? calculateValue(stats.mahalle[id]) : calculateValue(stats.ilce[ilce]);
+                layer.setStyle({ fillColor: getColor(val, min, maxLegend, steps), fillOpacity: val > 0 ? 0.9 : 0.45, color: '#475569', weight: view === 'ilce' ? 0.3 : 0.7, opacity: 1, interactive: true });
+            });
+            renderLegend(min, maxLegend, steps);
+            updateSummaryCard();
+        }
+
+        function getColor(v, min, max, steps) {
+            if (v === 0 || isNaN(v)) return 'rgba(203, 213, 225, 0.4)';
+            if (config.mode === 'percent' && max > 100) max = 100;
+            const range = max - min;
+            const paletteColors = PALETTES[config.palette];
+            if (range <= 0) return paletteColors[paletteColors.length - 1];
+
+            const p = Math.min(1, (v - min) / range);
+            const index = Math.floor(p * steps);
+            const colorIndex = Math.floor((index / steps) * paletteColors.length);
+            return paletteColors[Math.min(colorIndex, paletteColors.length - 1)];
+        }
+
+        function updateSummaryCard() {
+            if (!excelData) return;
+
+            // TOPLAM: Her zaman ilce stats'indan hesapla (GeoJSON'da karsiliksiz mahalleler de dahil olur)
+            // Bu sayede Mahalle/Ilce gorunum degisince toplam degismez
+            let ilceItems = Object.entries(stats.ilce).map(([name, i]) => ({ id: name, val: calculateValue(i), ilce: name }));
+            if (config.ilce !== 'all') ilceItems = ilceItems.filter(x => x.ilce === config.ilce);
+            const totalVals = ilceItems.map(x => x.val);
+            const total = totalVals.reduce((a, b) => a + b, 0);
+
+            // ORTALAMA: Gorunume gore farkli bolucuyle hesapla
+            let avgDivisor = 1;
+            if (config.view === 'mahalle') {
+                // Benzersiz sistem mahallesi sayisi
+                avgDivisor = getUniqueMahalleItems(config.ilce).length || 1;
+            } else {
+                avgDivisor = ilceItems.length || 1;
+            }
+
+            document.getElementById('stat-total').innerHTML = `Toplam: <b style="color:#fff">${total.toLocaleString('tr', { maximumFractionDigits: 2 })}${config.mode === 'percent' ? '%' : ''}</b>`;
+            document.getElementById('stat-avg').innerHTML = `Ortalama: <b style="color:#fff">${(total / avgDivisor).toLocaleString('tr', { maximumFractionDigits: 2 })}${config.mode === 'percent' ? '%' : ''}</b>`;
+            document.getElementById('stat-match').innerHTML = `Eşleşme: <b style="color:#fff">%${((stats.matchedCount / excelData.length) * 100).toFixed(1)}</b>`;
+        }
+
+        function renderLegend(min, max, steps) {
+            const body = document.getElementById('legend-body'); body.innerHTML = '';
+            const nullItem = document.createElement('div'); nullItem.className = 'legend-item';
+            nullItem.innerHTML = `<div class="color-box" style="background:rgba(203, 213, 225, 0.4)"></div> <span>Veri Yok / Sabit</span>`;
+            body.appendChild(nullItem);
+
+            const paletteColors = PALETTES[config.palette];
+            const r = max - min, stepSize = r / steps;
+            for (let i = 0; i < steps; i++) {
+                const s = min + (i * stepSize), e = min + ((i + 1) * stepSize);
+                const colorIndex = Math.floor((i / steps) * paletteColors.length);
+                const color = paletteColors[Math.min(colorIndex, paletteColors.length - 1)];
+
+                body.innerHTML += `<div class="legend-item"><div class="color-box" style="background:${color}"></div><span>${s.toLocaleString('tr', { maximumFractionDigits: 0 })}${config.mode === 'percent' ? '%' : ''} - ${e.toLocaleString('tr', { maximumFractionDigits: 0 })}${config.mode === 'percent' ? '%' : ''}</span></div>`;
+            }
+        }
+
+        function renderMap() {
+            if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+            geoJsonLayer = L.geoJSON(geoData, {
+                style: { weight: 0.5, color: '#475569', fillOpacity: 0.15, fillColor: 'rgba(203, 213, 225, 0.3)' },
+                onEachFeature: (f, l) => {
+                    l.on({
+                        click: (e) => { if (e.target.options.opacity !== 0) showDetails(e.target.feature.properties, e.latlng); }
+                    });
+                }
+            }).addTo(map);
+        }
+
+        function showDetails(props, latlng) {
+            const id = props.KIMLIKNO, ilce = props.ILCEAD;
+            const data = (config.view === 'mahalle') ? stats.mahalle[id] : stats.ilce[ilce];
+
+            let matchInfo = null;
+            if (mappingData && mappingData.eslesmeler) {
+                matchInfo = Object.values(mappingData.eslesmeler).find(e => e.eslesmeler && (e.eslesmeler.includes(String(id)) || e.eslesmeler.includes(Number(id))));
+            }
+
+            let displayName = `<span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:4px;">${ilce}</span>`;
+            if (config.view === 'mahalle') {
+                displayName += props.AD;
+                if (data?.sistemMahalle) {
+                    displayName += `<br><span style="font-size:0.85rem; color:var(--accent);">Sistem: ${data.sistemMahalle}</span>`;
+                } else if (matchInfo) {
+                    displayName += `<br><span style="font-size:0.85rem; color:var(--accent);">Sistem: ${matchInfo.sistemMahalle}</span>`;
+                }
+            } else if (config.view === 'ilce') {
+                displayName = ilce;
+            }
+
+            let content = `<div style="font-weight:700; font-size:1.1rem; border-bottom:3px solid var(--accent); padding-bottom:10px; margin-bottom:15px; line-height:1.4">${displayName}</div>`;
+
+            if (data) {
+                if (config.mode === 'percent') {
+                    const ratio = calculateValue(data);
+                    content += `<div style="background:rgba(59,130,246,0.2); padding:10px; border-radius:8px; border:1px solid var(--accent); margin-bottom:15px; text-align:center"><div style="font-size:0.75rem; color:var(--text-secondary)">HESAPLANAN ORAN</div><div style="font-size:1.8rem; font-weight:800; color:#fff">%${ratio.toLocaleString('tr', { maximumFractionDigits: 2 })}</div></div>`;
+                }
+                content += `<table class="popup-table">`;
+                for (let [k, v] of Object.entries(data.sums)) {
+                    const isSingleH = (config.mode === 'single' && k === config.column);
+                    const isNumH = (config.mode === 'percent' && k === config.numerator);
+                    const isDenH = (config.mode === 'percent' && k === config.denominator);
+                    const isH = isSingleH || isNumH || isDenH;
+
+                    content += `<tr class="${isH ? 'highlight' : ''}"><td>${k}</td><td style="text-align:right"><b>${v.toLocaleString('tr', { maximumFractionDigits: 2 })}</b></td></tr>`;
+
+                    if (isSingleH && config.useCountSingle) {
+                        content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet bilgisi)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+                    }
+                    if (isNumH && config.useCountNum) {
+                        content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet - Pay)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+                    }
+                    if (isDenH && config.useCountDen && (!isNumH || !config.useCountNum)) {
+                        content += `<tr class="highlight"><td style="padding-left:15px; font-size:0.75rem;"><span style="color:var(--accent);">↳</span> <i>(Adet - Payda)</i></td><td style="text-align:right; font-size:0.8rem; color:var(--accent);"><b>${(data.counts[k] || 0).toLocaleString('tr')}</b> <span style="font-size:0.7rem;">adet</span></td></tr>`;
+                    }
+                }
+                content += `</table>`;
+            } else {
+                if (matchInfo) {
+                    content += `<div style="background:rgba(249, 115, 22, 0.1); padding:10px; border-radius:8px; border:1px solid rgba(249, 115, 22, 0.3); text-align:center;">
                                 <div style="color:#fb923c; font-size:0.85rem; font-weight:700;">✓ Sistem Veritabanında Eşleşmiş</div>
                                 <div style="color:var(--text-secondary); font-size:0.75rem; margin-top:4px;">Ancak sağ veya üstteki Excel verinizde bu mahalleye ait bir kayıt veya sayısal değer (0 dahil) bulunamadı.</div>
                             </div>`;
-            } else {
-                content += `<div style="color:#64748b; font-size:0.85rem">Sisteme henüz eşleştirilmemiş.</div>`;
+                } else {
+                    content += `<div style="color:#64748b; font-size:0.85rem">Sisteme henüz eşleştirilmemiş.</div>`;
+                }
             }
+            L.popup({ className: 'custom-popup', minWidth: 320 }).setLatLng(latlng).setContent(content).openOn(map);
         }
-        L.popup({className: 'custom-popup', minWidth: 320}).setLatLng(latlng).setContent(content).openOn(map);
-    }
 
-    function fillSelects(ids, options) {
-        ids.forEach(id => {
-            const el = document.getElementById(id); el.innerHTML = '';
-            options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.textContent = opt; el.appendChild(o); });
-        });
-        config.column = document.getElementById('col-single').value;
-        config.numerator = document.getElementById('col-numerator').value;
-        config.denominator = document.getElementById('col-denominator').value;
-    }
+        function fillSelects(ids, options) {
+            ids.forEach(id => {
+                const el = document.getElementById(id); el.innerHTML = '';
+                options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.textContent = opt; el.appendChild(o); });
+            });
+            config.column = document.getElementById('col-single').value;
+            config.numerator = document.getElementById('col-numerator').value;
+            config.denominator = document.getElementById('col-denominator').value;
+        }
 
-    function getIlceById(id) { return geoData.features.find(f => f.properties.KIMLIKNO == id)?.properties.ILCEAD || ""; }
-    
-    function setupEvents() {
-        document.querySelectorAll('.btn-toggle-group button').forEach(btn => {
-            btn.onclick = (e) => {
-                const grp = e.target.parentElement.id; const val = e.target.dataset.mode || e.target.dataset.view;
-                document.querySelectorAll(`#${grp} button`).forEach(b => b.classList.remove('active')); e.target.classList.add('active');
-                if (grp === 'mode-toggle') { 
-                    config.mode = val; 
-                    document.getElementById('single-col-group').classList.toggle('hidden', val !== 'single');
-                    document.getElementById('percent-col-group').classList.toggle('hidden', val !== 'percent');
-                } else config.view = val;
+        function getIlceById(id) { return geoData.features.find(f => f.properties.KIMLIKNO == id)?.properties.ILCEAD || ""; }
+
+        function setupEvents() {
+            document.querySelectorAll('.btn-toggle-group button').forEach(btn => {
+                btn.onclick = (e) => {
+                    const grp = e.target.parentElement.id; const val = e.target.dataset.mode || e.target.dataset.view;
+                    document.querySelectorAll(`#${grp} button`).forEach(b => b.classList.remove('active')); e.target.classList.add('active');
+                    if (grp === 'mode-toggle') {
+                        config.mode = val;
+                        document.getElementById('single-col-group').classList.toggle('hidden', val !== 'single');
+                        document.getElementById('percent-col-group').classList.toggle('hidden', val !== 'percent');
+                    } else config.view = val;
+                    refreshVisuals();
+                };
+            });
+            document.getElementById('col-single').onchange = (e) => { config.column = e.target.value; refreshVisuals(); };
+            document.getElementById('col-numerator').onchange = (e) => { config.numerator = e.target.value; refreshVisuals(); };
+            document.getElementById('col-denominator').onchange = (e) => { config.denominator = e.target.value; refreshVisuals(); };
+            document.getElementById('ilce-filter').onchange = (e) => { config.ilce = e.target.value; refreshVisuals(); };
+            document.getElementById('city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('overlay-city-select').value = e.target.value; handleFile(null); };
+            document.getElementById('overlay-city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('city-select').value = e.target.value; };
+            document.getElementById('count-single-toggle').onchange = (e) => { config.useCountSingle = e.target.checked; refreshVisuals(); };
+            document.getElementById('count-num-toggle').onchange = (e) => { config.useCountNum = e.target.checked; refreshVisuals(); };
+            document.getElementById('count-den-toggle').onchange = (e) => { config.useCountDen = e.target.checked; refreshVisuals(); };
+
+            const slider = document.getElementById('max-limit-slider');
+            const manualToggle = document.getElementById('manual-max-toggle');
+            const sliderContainer = document.getElementById('slider-container');
+            document.getElementById('palette-select').onchange = (e) => { config.palette = e.target.value; refreshVisuals(); };
+            document.getElementById('legend-steps').onchange = (e) => { config.legendSteps = e.target.value; refreshVisuals(); };
+
+            // --- YEREL JSON OVERLAY MANTIĞI ---
+            window.localMappingDataStr = null;
+            document.getElementById('overlay-local-mapping').onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const testJson = JSON.parse(event.target.result);
+                        if (testJson && testJson.eslesmeler) {
+                            window.localMappingDataStr = event.target.result;
+                            const info = document.getElementById('overlay-local-mapping-info');
+                            info.textContent = `📁 Yerel dosya aktif: ${file.name}`;
+                            info.style.display = 'block';
+                            document.getElementById('overlay-mapping-select').style.opacity = '0.5';
+                        } else {
+                            alert("Geçersiz format: 'eslesmeler' nesnesi bulunamadı.");
+                        }
+                    } catch (err) { alert("JSON okuma hatası!"); }
+                };
+                reader.readAsText(file);
+            };
+
+            document.getElementById('overlay-mapping-select').addEventListener('change', () => {
+                window.localMappingDataStr = null;
+                document.getElementById('overlay-local-mapping-info').style.display = 'none';
+                document.getElementById('overlay-mapping-select').style.opacity = '1';
+            });
+
+            manualToggle.onchange = (e) => {
+                const isManual = e.target.checked;
+                sliderContainer.style.pointerEvents = isManual ? 'auto' : 'none';
+                sliderContainer.style.opacity = isManual ? '1' : '0.4';
                 refreshVisuals();
             };
-        });
-        document.getElementById('col-single').onchange = (e) => { config.column = e.target.value; refreshVisuals(); };
-        document.getElementById('col-numerator').onchange = (e) => { config.numerator = e.target.value; refreshVisuals(); };
-        document.getElementById('col-denominator').onchange = (e) => { config.denominator = e.target.value; refreshVisuals(); };
-        document.getElementById('ilce-filter').onchange = (e) => { config.ilce = e.target.value; refreshVisuals(); };
-        document.getElementById('city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('overlay-city-select').value = e.target.value; handleFile(null); };
-        document.getElementById('overlay-city-select').onchange = (e) => { config.city = e.target.value; document.getElementById('city-select').value = e.target.value; };
-        document.getElementById('count-single-toggle').onchange = (e) => { config.useCountSingle = e.target.checked; refreshVisuals(); };
-        document.getElementById('count-num-toggle').onchange = (e) => { config.useCountNum = e.target.checked; refreshVisuals(); };
-        document.getElementById('count-den-toggle').onchange = (e) => { config.useCountDen = e.target.checked; refreshVisuals(); };
-        
-        const slider = document.getElementById('max-limit-slider');
-        const manualToggle = document.getElementById('manual-max-toggle');
-        const sliderContainer = document.getElementById('slider-container');
-        document.getElementById('palette-select').onchange = (e) => { config.palette = e.target.value; refreshVisuals(); };
-        document.getElementById('legend-steps').onchange = (e) => { config.legendSteps = e.target.value; refreshVisuals(); };
 
-        manualToggle.onchange = (e) => {
-            const isManual = e.target.checked;
-            sliderContainer.style.pointerEvents = isManual ? 'auto' : 'none';
-            sliderContainer.style.opacity = isManual ? '1' : '0.4';
-            refreshVisuals();
-        };
+            slider.oninput = (e) => {
+                config.manualMax = parseFloat(e.target.value);
+                document.getElementById('max-limit-val').value = Math.ceil(config.manualMax);
+                refreshVisuals();
+            };
 
-        slider.oninput = (e) => {
-            config.manualMax = parseFloat(e.target.value);
-            document.getElementById('max-limit-val').value = Math.ceil(config.manualMax);
-            refreshVisuals();
-        };
+            const maxInput = document.getElementById('max-limit-val');
+            maxInput.oninput = (e) => {
+                if (!manualToggle.checked) return;
+                const val = parseFloat(e.target.value) || 1;
+                config.manualMax = val;
+                slider.value = val;
+                refreshVisuals();
+            };
 
-        const maxInput = document.getElementById('max-limit-val');
-        maxInput.oninput = (e) => {
-            if (!manualToggle.checked) return;
-            const val = parseFloat(e.target.value) || 1;
-            config.manualMax = val;
-            slider.value = val;
-            refreshVisuals();
-        };
+            const dZ = document.getElementById('drop-zone'), fI = document.getElementById('file-input');
+            dZ.onclick = () => fI.click();
 
-        const dZ = document.getElementById('drop-zone'), fI = document.getElementById('file-input');
-        dZ.onclick = () => fI.click();
-        
-        dZ.ondragover = (e) => { e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--accent)"; };
-        dZ.ondragleave = (e) => { e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--border)"; };
-        dZ.ondrop = (e) => { 
-            e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--border)";
-            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
-        };
-        
-        fI.onchange = (e) => handleFile(e.target.files[0]);
-        document.getElementById('re-upload').onclick = () => document.getElementById('upload-overlay').classList.remove('hidden');
+            dZ.ondragover = (e) => { e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--accent)"; };
+            dZ.ondragleave = (e) => { e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--border)"; };
+            dZ.ondrop = (e) => {
+                e.preventDefault(); e.stopPropagation(); dZ.style.borderColor = "var(--border)";
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+            };
 
-        document.getElementById('mobile-toggle-menu')?.addEventListener('click', function() {
-            const content = document.querySelector('.sidebar-content');
-            content.classList.toggle('active');
-            this.textContent = content.classList.contains('active') ? '▲ Kapat' : '▼ Menü';
-        });
-    }
+            fI.onchange = (e) => handleFile(e.target.files[0]);
+            document.getElementById('re-upload').onclick = () => document.getElementById('upload-overlay').classList.remove('hidden');
 
-    function showLoader(s) { document.getElementById('loader').style.display = s ? 'grid' : 'none'; }
-    function updateEditLink() {
-        const link = document.getElementById('edit-mappings-link');
-        if (link && config.city) link.href = `index_eslesme.html?city=${encodeURIComponent(config.city)}`;
-    }
+            document.getElementById('mobile-toggle-menu')?.addEventListener('click', function () {
+                const content = document.querySelector('.sidebar-content');
+                content.classList.toggle('active');
+                this.textContent = content.classList.contains('active') ? '▲ Kapat' : '▼ Menü';
+            });
+        }
 
-    // Lejant paneli aç/kapat
-    let legendOpen = true;
-    function toggleLegend() {
-        legendOpen = !legendOpen;
-        const body = document.getElementById('legend-body');
-        const btn  = document.getElementById('legend-toggle-btn');
-        body.style.display = legendOpen ? 'block' : 'none';
-        btn.textContent = legendOpen ? '▲' : '▼';
-        // Lejant başlığı padding'ini ayarla
-        document.getElementById('legend-header').style.paddingBottom = legendOpen ? '0' : '0';
-    }
+        function showLoader(s) { document.getElementById('loader').style.display = s ? 'grid' : 'none'; }
+        function updateEditLink() {
+            const link = document.getElementById('edit-mappings-link');
+            if (link && config.city) link.href = `index_eslesme.html?city=${encodeURIComponent(config.city)}`;
+        }
 
-    // Mobilde lejant kapalı başlasın
-    if (window.innerWidth <= 768) {
-        window.addEventListener('DOMContentLoaded', () => {
+        // Lejant paneli aç/kapat
+        let legendOpen = true;
+        function toggleLegend() {
+            legendOpen = !legendOpen;
             const body = document.getElementById('legend-body');
-            const btn  = document.getElementById('legend-toggle-btn');
-            if (body && btn) { body.style.display = 'none'; btn.textContent = '▼'; legendOpen = false; }
-        });
-    }
+            const btn = document.getElementById('legend-toggle-btn');
+            body.style.display = legendOpen ? 'block' : 'none';
+            btn.textContent = legendOpen ? '▲' : '▼';
+            // Lejant başlığı padding'ini ayarla
+            document.getElementById('legend-header').style.paddingBottom = legendOpen ? '0' : '0';
+        }
 
-    init();
-</script>
+        // Mobilde lejant kapalı başlasın
+        if (window.innerWidth <= 768) {
+            window.addEventListener('DOMContentLoaded', () => {
+                const body = document.getElementById('legend-body');
+                const btn = document.getElementById('legend-toggle-btn');
+                if (body && btn) { body.style.display = 'none'; btn.textContent = '▼'; legendOpen = false; }
+            });
+        }
+
+        init();
+    </script>
 </body>
+
 </html>
